@@ -1,13 +1,3 @@
-"""
-app.py
-------
-FinIntel AI — Financial Intelligence Platform
-Main Streamlit application entry point.
-
-Run with:
-    streamlit run app.py
-"""
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -30,7 +20,7 @@ def _load_groq_key() -> str | None:
 
     # 1. Streamlit secrets
     try:
-        key = st.secrets["GROQ_API_KEY"]          # raises KeyError if missing
+        key = st.secrets["GROQ_API_KEY"]        
         if key and key.startswith("gsk_"):
             return key.strip()
     except Exception:
@@ -62,7 +52,7 @@ from utils import (
     fmt_large, fmt_price, fmt_pct, fmt_multiple,
     build_price_chart, build_kpi_bar_chart, build_health_radar,
     build_peer_comparison_chart, build_revenue_trend_chart,
-    kpi_card, health_badge, chart_config, COLORS, layout_defaults,
+    kpi_card, health_badge, chart_config, layout_defaults, COLORS,
 )
 
 # ─── Page config ──────────────────────────────────────────────────────────────
@@ -70,7 +60,7 @@ st.set_page_config(
     page_title="FinIntel AI",
     page_icon="📊",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="expanded",  # always open on load
 )
 
 # ─── Global CSS ───────────────────────────────────────────────────────────────
@@ -84,9 +74,26 @@ html, body, [class*="css"] {
     font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
 }
 
-/* Hide Streamlit default elements */
-#MainMenu, footer, header { visibility: hidden; }
+/* Hide Streamlit default elements — keep header visible for sidebar toggle */
+#MainMenu { visibility: hidden; }
+footer { visibility: hidden; }
 .stDeployButton { display: none; }
+
+/* Hide header bar background/border but keep the toggle button functional */
+[data-testid="stHeader"] {
+    background: transparent !important;
+    border-bottom: none !important;
+}
+
+/* Keep sidebar collapse/expand button always visible */
+[data-testid="collapsedControl"],
+[data-testid="stSidebarCollapsedControl"],
+button[kind="header"] {
+    visibility: visible !important;
+    display: flex !important;
+    opacity: 1 !important;
+    pointer-events: all !important;
+}
 
 /* Main background */
 .stApp { background-color: #000000; }
@@ -254,7 +261,7 @@ with st.sidebar:
     st.markdown("""
     <div style="padding: 8px 0 20px 0">
         <p style="font-size:22px;font-weight:800;color:#FFFFFF;margin:0;letter-spacing:-0.5px">
-            📊 FinIntel AI
+             FinIntel AI
         </p>
         <p style="font-size:12px;color:#8E8E93;margin:4px 0 0 0;font-weight:500">
             Financial Intelligence Platform
@@ -271,7 +278,7 @@ with st.sidebar:
 
     search_col, _ = st.columns([1, 1])
     with search_col:
-        search_btn = st.button("🔍 Analyze", use_container_width=True)
+        search_btn = st.button(" Analyze", use_container_width=True)
 
     # Quick access companies
     st.markdown("---")
@@ -479,13 +486,13 @@ st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
 # ─── Navigation tabs ───────────────────────────────────────────────────────────
 tabs = st.tabs([
-    "📈 Price & Charts",
-    "📋 Financials",
-    "🎯 KPIs & Health",
-    "💡 Insights",
-    "📰 News",
-    "🤖 AI Copilot",
-    "🏆 Peer Compare",
+    " Price & Charts",
+    " Financials",
+    " KPIs & Health",
+    " Insights",
+    " News",
+    " AI Copilot",
+    " Peer Compare",
 ])
 
 
@@ -697,7 +704,7 @@ with tabs[3]:
 
     gen_col, _ = st.columns([1, 3])
     with gen_col:
-        if st.button("📄 Generate CFO Brief", use_container_width=True):
+        if st.button(" Generate CFO Brief", use_container_width=True):
             with st.spinner("Compiling CFO Brief..."):
                 news_items = get_company_news(ticker, full_name, limit=8)
                 st.session_state.cfo_brief = generate_cfo_brief(
@@ -740,7 +747,7 @@ with tabs[4]:
             unsafe_allow_html=True,
         )
     with refresh_col:
-        if st.button("🔄 Refresh News"):
+        if st.button(" Refresh News"):
             st.session_state.news_refresh += 1
             get_company_news.clear()
 
@@ -766,7 +773,7 @@ with tabs[4]:
                     <span style="background:#2C2C2E;border-radius:5px;
                                  padding:2px 8px;font-size:11px;color:#8E8E93;
                                  font-weight:500">{publisher}</span>
-                    <span style="color:#48484A;font-size:12px">📅 {pub_date}</span>
+                    <span style="color:#48484A;font-size:12px"> {pub_date}</span>
                     <a href="{link}" target="_blank" style="color:#0A84FF;
                        font-size:12px;text-decoration:none;margin-left:auto">Read →</a>
                 </div>
@@ -792,7 +799,7 @@ with tabs[5]:
             <div style="background:#FF9F0A11;border:1px solid #FF9F0A33;
                          border-radius:10px;padding:12px 16px;margin-bottom:16px">
                 <p style="color:#FF9F0A;font-size:13px;margin:0;font-weight:500">
-                    💡 Add your Groq API key in the sidebar for full AI responses.
+                     Add your Groq API key in the sidebar for full AI responses.
                     Rule-based answers available without a key.
                 </p>
             </div>
