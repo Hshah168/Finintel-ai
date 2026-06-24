@@ -1,10 +1,3 @@
-"""
-financials.py
--------------
-Retrieves financial statements and stock price history via yfinance.
-All functions return clean pandas DataFrames ready for display.
-"""
-
 import yfinance as yf
 import pandas as pd
 import numpy as np

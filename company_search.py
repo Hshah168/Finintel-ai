@@ -1,21 +1,3 @@
-"""
-company_search.py
------------------
-Resolves company names to ticker symbols using a three-layer pipeline:
-
-  Layer 1 — Private company blocklist (instant rejection with clear message)
-  Layer 2 — Curated alias map (fast, guaranteed-correct for known companies)
-  Layer 3 — Intelligent auto-discovery (handles ANY newly public company
-             automatically, using Yahoo Finance + Wikipedia + verification)
-
-Layer 3 is the key innovation: it means the app never needs a manual update
-when a new company goes public. The auto-discovery pipeline:
-  a) Queries Yahoo Finance search API
-  b) Scores candidates by exchange quality and name similarity
-  c) Verifies the winner actually has live market data (not a shell/delisted co.)
-  d) Caches confirmed results in Streamlit session state for instant reuse
-"""
-
 import yfinance as yf
 import requests
 import streamlit as st
