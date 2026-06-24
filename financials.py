@@ -122,7 +122,10 @@ def format_statement_df(df: pd.DataFrame) -> pd.DataFrame:
         b = x / 1e9
         return f"${b:,.2f}B"
 
-    return display.applymap(fmt)
+    try:
+        return display.map(fmt)       # pandas >= 2.1
+    except AttributeError:
+        return display.applymap(fmt)  # pandas < 2.1 fallback
 
 
 def get_peers(ticker: str, info: dict) -> list[str]:
