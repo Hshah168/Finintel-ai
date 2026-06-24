@@ -138,6 +138,17 @@ def get_peers(ticker: str, info: dict) -> list[str]:
     Falls back to sector-based peers if ticker not in map.
     """
     peer_map = {
+        # ── Space / Aerospace ─────────────────────────────────────────────
+        "SPCX": ["BA", "LMT", "RKLB"],       # SpaceX
+        "RKLB": ["SPCX", "ASTR", "BA"],       # Rocket Lab
+        # ── 2025-2026 IPOs ────────────────────────────────────────────────
+        "CRWV": ["NVDA", "AMD", "CBRS"],      # CoreWeave — AI cloud
+        "CBRS": ["NVDA", "CRWV", "AMD"],      # Cerebras — AI chips
+        "CRCL": ["COIN", "PYPL", "V"],        # Circle Internet — crypto/stablecoin
+        "FIG":  ["ADBE", "CRM", "NOW"],       # Figma — design platform
+        "QNT":  ["IBM", "IONQ", "RGTI"],      # Quantinuum — quantum computing
+        "STUB": ["LYV", "SEAS", "BKNG"],      # StubHub — ticketing
+        "MDLN": ["ABT", "MDT", "BDX"],        # Medline — medical supplies
         # ── US Mega-cap Tech ──────────────────────────────────────────────
         "MSFT": ["AAPL", "GOOGL", "AMZN"],
         "AAPL": ["MSFT", "GOOGL", "SAMSUNG"],

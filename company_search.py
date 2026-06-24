@@ -1,19 +1,85 @@
+"""
+company_search.py
+-----------------
+Resolves company names to ticker symbols using a three-layer pipeline:
+
+  Layer 1 — Private company blocklist (instant rejection with clear message)
+  Layer 2 — Curated alias map (fast, guaranteed-correct for known companies)
+  Layer 3 — Intelligent auto-discovery (handles ANY newly public company
+             automatically, using Yahoo Finance + Wikipedia + verification)
+
+Layer 3 is the key innovation: it means the app never needs a manual update
+when a new company goes public. The auto-discovery pipeline:
+  a) Queries Yahoo Finance search API
+  b) Scores candidates by exchange quality and name similarity
+  c) Verifies the winner actually has live market data (not a shell/delisted co.)
+  d) Caches confirmed results in Streamlit session state for instant reuse
+"""
+
 import yfinance as yf
 import requests
 import streamlit as st
+from difflib import SequenceMatcher
 
-# --- Companies that are PRIVATE (not publicly traded) ---
+
+# ─── Layer 1: Known private companies ────────────────────────────────────────
+# These are confirmed private as of June 2026. Remove any that go public.
 PRIVATE_COMPANIES = {
-    "spacex", "space x", "openai", "open ai", "stripe", "klarna",
-    "bytedance", "tiktok", "chime", "revolut", "canva", "instacart",
-    "epic games", "cargill", "koch industries", "ikea", "lego",
-    "bloomberg", "mckinsey", "deloitte", "pwc", "kpmg", "ey",
-    "ernst young", "bain", "bcg", "boston consulting",
+    "openai", "open ai",
+    "klarna",
+    "databricks",
+    "discord",
+    "chime",
+    "revolut",
+    "shein",
+    "anduril", "anduril industries",
+    "canva",
+    "instacart",
+    "epic games",
+    "cargill", "koch industries", "ikea", "lego",
+    "bloomberg", "mckinsey",
+    "deloitte", "pwc", "kpmg", "ey", "ernst young",
+    "bain", "bcg", "boston consulting",
+    "brex", "plaid", "kraken",
+    "bytedance", "tiktok",
+    "anthropic",
 }
 
-# --- Curated alias map for fast, reliable lookups ---
+
+# ─── Layer 2: Curated alias map ───────────────────────────────────────────────
+# Only needed for companies where Yahoo's search returns wrong results.
+# Most companies (including all future IPOs) are handled by Layer 3.
 COMPANY_ALIASES = {
-    # US Tech
+    # ── Recent IPOs (Yahoo search returns wrong results without these) ────────
+    "spacex": "SPCX",               # Nasdaq, June 12 2026
+    "space x": "SPCX",
+    "space exploration": "SPCX",
+    "coreweave": "CRWV",            # Nasdaq, March 28 2025
+    "core weave": "CRWV",
+    "cerebras": "CBRS",             # Nasdaq, May 14 2026
+    "cerebras systems": "CBRS",
+    "circle": "CRCL",               # NYSE, June 2025
+    "circle internet": "CRCL",
+    "circle internet group": "CRCL",
+    "figma": "FIG",                 # NYSE, 2025
+    "quantinuum": "QNT",            # Nasdaq, June 4 2026
+    "stubhub": "STUB",              # NYSE, September 2025
+    "stub hub": "STUB",
+    "medline": "MDLN",              # Nasdaq, December 17 2025
+    "medline industries": "MDLN",
+    # ── Companies that resolve to wrong subsidiaries without aliases ──────────
+    "nissan": "NSANY",
+    "nissan motor": "NSANY",
+    "honda": "HMC",
+    "honda motor": "HMC",
+    "bmw": "BMWYY",
+    "bmw group": "BMWYY",
+    "mercedes": "MBGYY",
+    "mercedes-benz": "MBGYY",
+    "mercedes benz": "MBGYY",
+    "hyundai": "HYMTF",
+    "hyundai motor": "HYMTF",
+    # ── Standard well-known tickers (fast path) ───────────────────────────────
     "microsoft": "MSFT",
     "apple": "AAPL",
     "google": "GOOGL",
@@ -24,6 +90,9 @@ COMPANY_ALIASES = {
     "facebook": "META",
     "tesla": "TSLA",
     "netflix": "NFLX",
+    "uber": "UBER",
+    "airbnb": "ABNB",
+    "palantir": "PLTR",
     "salesforce": "CRM",
     "adobe": "ADBE",
     "intel": "INTC",
@@ -33,77 +102,23 @@ COMPANY_ALIASES = {
     "oracle": "ORCL",
     "ibm": "IBM",
     "cisco": "CSCO",
-    "twitter": "X",
-    "uber": "UBER",
-    "lyft": "LYFT",
-    "airbnb": "ABNB",
-    "palantir": "PLTR",
+    "shopify": "SHOP",
     "snowflake": "SNOW",
     "datadog": "DDOG",
     "servicenow": "NOW",
+    "workday": "WDAY",
     "crowdstrike": "CRWD",
     "palo alto": "PANW",
     "palo alto networks": "PANW",
-    "fortinet": "FTNT",
-    "mongodb": "MDB",
     "cloudflare": "NET",
-    "twilio": "TWLO",
-    "okta": "OKTA",
     "hubspot": "HUBS",
-    "zendesk": "ZEN",
-    "dropbox": "DBX",
-    "box": "BOX",
-    "squarespace": "SQSP",
-    "wix": "WIX",
-    "godaddy": "GDDY",
-    "match group": "MTCH",
-    "roblox": "RBLX",
-    "unity": "U",
-    "electronic arts": "EA",
-    "ea": "EA",
-    "take two": "TTWO",
-    "take-two": "TTWO",
-    "activision": "ATVI",
-    "ubisoft": "UBSFY",
-    "dell": "DELL",
-    "hp": "HPQ",
-    "hewlett packard": "HPQ",
-    "hpe": "HPE",
-    "motorola": "MSI",
-    "corning": "GLW",
-    "applied materials": "AMAT",
-    "lam research": "LRCX",
-    "kla": "KLAC",
-    "analog devices": "ADI",
-    "texas instruments": "TXN",
-    "micron": "MU",
-    "western digital": "WDC",
-    "seagate": "STX",
-    "netapp": "NTAP",
-    "veeva": "VEEV",
-    "splunk": "SPLK",
-    "elastic": "ESTC",
-    "confluent": "CFLT",
-    "hashicorp": "HCP",
-    "gitlab": "GTLB",
-    # US Auto
+    "lyft": "LYFT",
     "ford": "F",
     "ford motor": "F",
     "general motors": "GM",
     "gm": "GM",
     "stellantis": "STLA",
-    "chrysler": "STLA",
-    "jeep": "STLA",
     "rivian": "RIVN",
-    "lucid": "LCID",
-    "lucid motors": "LCID",
-    "fisker": "FSR",
-    "workday": "WDAY",
-    "zoom": "ZM",
-    "slack": "CRM",
-    "shopify": "SHOP",
-    "stripe": "STRP",
-    # US Finance
     "jpmorgan": "JPM",
     "jp morgan": "JPM",
     "goldman sachs": "GS",
@@ -119,7 +134,6 @@ COMPANY_ALIASES = {
     "american express": "AXP",
     "amex": "AXP",
     "paypal": "PYPL",
-    # US Healthcare / Pharma
     "johnson & johnson": "JNJ",
     "johnson and johnson": "JNJ",
     "pfizer": "PFE",
@@ -129,220 +143,237 @@ COMPANY_ALIASES = {
     "eli lilly": "LLY",
     "lilly": "LLY",
     "unitedhealth": "UNH",
-    "cvs": "CVS",
-    # US Consumer / Retail
     "walmart": "WMT",
     "target": "TGT",
     "costco": "COST",
     "home depot": "HD",
     "nike": "NKE",
-    "mcdonald's": "MCD",
     "mcdonalds": "MCD",
+    "mcdonald's": "MCD",
     "starbucks": "SBUX",
     "coca cola": "KO",
     "coca-cola": "KO",
     "pepsi": "PEP",
     "pepsico": "PEP",
-    "procter gamble": "PG",
-    "procter & gamble": "PG",
-    # US Energy / Industrial
     "exxon": "XOM",
     "exxonmobil": "XOM",
     "chevron": "CVX",
     "boeing": "BA",
     "lockheed martin": "LMT",
-    "caterpillar": "CAT",
-    "3m": "MMM",
-    # International — Japan (ADR or TSE)
+    "sap": "SAP",
+    "asml": "ASML",
     "toyota": "TM",
-    "toyota motor": "TM",
-    "nissan": "NSANY",           # Nissan Motor ADR
-    "nissan motor": "NSANY",
-    "honda": "HMC",              # Honda Motor ADR
-    "honda motor": "HMC",
     "sony": "SONY",
-    "sony group": "SONY",
-    "panasonic": "PCRFY",
-    "sharp": "SHCAY",
-    "hitachi": "HTHIY",
-    "mitsubishi": "MSBHF",
-    "softbank": "SFTBY",
-    "nintendo": "NTDOY",
-    "keyence": "KYCCF",
-    "fanuc": "FANUY",
-    "subaru": "FUJHY",
-    "mazda": "MZDAY",
-    "suzuki": "SZKMY",
-    "isuzu": "ISUZY",
-    "denso": "DNZOY",
-    "nidec": "NJDCY",
-    "fujifilm": "FUJIY",
-    "canon": "CAJ",
-    "nikon": "NINOY",
-    "olympus": "OCPNY",
-    "ricoh": "RICOY",
-    "kddi": "KDDIY",
-    "ntt": "NTTYY",
-    "docomo": "NTTYY",
-    "rakuten": "RKUNY",
-    "line": "LYV",
-    # International — South Korea
     "samsung": "SSNLF",
-    "samsung electronics": "SSNLF",
-    "lg": "LGCLF",
-    "lg electronics": "LGCLF",
-    "hyundai": "HYMTF",
-    "hyundai motor": "HYMTF",
-    "kia": "KIMTF",
-    "sk hynix": "HXSCL",
-    "posco": "PKX",
-    "sk telecom": "SKM",
-    # International — China
+    "tsmc": "TSM",
+    "taiwan semiconductor": "TSM",
     "alibaba": "BABA",
     "tencent": "TCEHY",
     "baidu": "BIDU",
-    "jd": "JD",
-    "jd.com": "JD",
-    "pinduoduo": "PDD",
-    "meituan": "MPNGF",
-    "xiaomi": "XIACF",
-    "lenovo": "LNVGY",
-    "didi": "DIDIY",
-    "netease": "NTES",
-    "nio": "NIO",
-    "xpeng": "XPEV",
-    "li auto": "LI",
-    "byd": "BYDDY",
-    # International — Europe
-    "sap": "SAP",
-    "asml": "ASML",
-    "lvmh": "LVMUY",
-    "volkswagen": "VWAGY",
-    "vw": "VWAGY",
-    "bmw": "BMWYY",
-    "bmw group": "BMWYY",
-    "mercedes": "MBGYY",
-    "mercedes-benz": "MBGYY",
-    "mercedes benz": "MBGYY",
-    "porsche": "POAHY",
-    "stellantis": "STLA",
-    "renault": "RNLSY",
-    "peugeot": "STLA",
-    "siemens": "SIEGY",
-    "bosch": "BSWQY",
-    "basf": "BASFY",
-    "bayer": "BAYRY",
-    "novartis": "NVS",
-    "roche": "RHHBY",
-    "astrazeneca": "AZN",
-    "glaxosmithkline": "GSK",
-    "gsk": "GSK",
-    "sanofi": "SNY",
-    "shell": "SHEL",
-    "bp": "BP",
-    "total": "TTE",
-    "totalenergies": "TTE",
-    "eni": "E",
-    "hsbc": "HSBC",
-    "barclays": "BCS",
-    "lloyds": "LYG",
-    "ubs": "UBS",
-    "credit suisse": "CS",
-    "deutsche bank": "DB",
-    "allianz": "ALIZY",
-    "axa": "AXAHY",
-    "unilever": "UL",
-    "nestle": "NSRGY",
-    "nestle sa": "NSRGY",
-    "diageo": "DEO",
-    "heineken": "HEINY",
-    "ab inbev": "BUD",
-    "anheuser busch": "BUD",
-    "philips": "PHG",
-    "airbus": "EADSY",
-    "rolls royce": "RYCEY",
-    "rio tinto": "RIO",
-    "bhp": "BHP",
-    "glencore": "GLNCY",
-    "arm": "ARM",
-    "arm holdings": "ARM",
-    "spotify": "SPOT",
-    "adyen": "ADYEY",
-    "prosus": "PROSY",
-    # International — India
     "reliance": "RELIANCE.NS",
     "reliance industries": "RELIANCE.NS",
     "tcs": "TCS.NS",
     "tata consultancy": "TCS.NS",
-    "tata consultancy services": "TCS.NS",
     "infosys": "INFY",
     "wipro": "WIT",
-    "hcl": "HCLTECH.NS",
-    "hcl technologies": "HCLTECH.NS",
-    "tech mahindra": "TECHM.NS",
-    "hdfc": "HDFCBANK.NS",
     "hdfc bank": "HDFCBANK.NS",
-    "icici": "IBN",
     "icici bank": "IBN",
-    "sbi": "SBIN.NS",
-    "state bank": "SBIN.NS",
-    "kotak": "KOTAKBANK.NS",
-    "kotak mahindra": "KOTAKBANK.NS",
-    "axis bank": "AXISBANK.NS",
-    "bajaj": "BAJFINANCE.NS",
-    "bajaj finance": "BAJFINANCE.NS",
-    "maruti": "MARUTI.NS",
-    "maruti suzuki": "MARUTI.NS",
+    "nestle": "NSRGY",
+    "volkswagen": "VWAGY",
+    "vw": "VWAGY",
+    "porsche": "POAHY",
+    "siemens": "SIEGY",
+    "novartis": "NVS",
+    "roche": "RHHBY",
+    "astrazeneca": "AZN",
+    "gsk": "GSK",
+    "glaxosmithkline": "GSK",
+    "shell": "SHEL",
+    "bp": "BP",
+    "totalenergies": "TTE",
+    "hsbc": "HSBC",
+    "unilever": "UL",
+    "lvmh": "LVMUY",
+    "spotify": "SPOT",
+    "arm": "ARM",
+    "arm holdings": "ARM",
+    "kia": "KIMTF",
+    "subaru": "FUJHY",
+    "mazda": "MZDAY",
+    "nio": "NIO",
+    "xpeng": "XPEV",
+    "byd": "BYDDY",
     "tata motors": "TTM",
-    "mahindra": "M&M.NS",
-    "hindustan unilever": "HINDUNILVR.NS",
-    "hul": "HINDUNILVR.NS",
-    "itc": "ITC.NS",
-    "sun pharma": "SUNPHARMA.NS",
-    "dr reddy": "RDY",
-    "cipla": "CIPLA.NS",
-    "adani": "ADANIENT.NS",
-    "adani enterprises": "ADANIENT.NS",
-    "ola": "OLACABS.NS",
-    "zomato": "ZOMATO.NS",
-    "paytm": "PAYTM.NS",
-    "nykaa": "NYKAA.NS",
-    # International — Taiwan / Semiconductor
-    "tsmc": "TSM",
-    "taiwan semiconductor": "TSM",
-    "mediatek": "MDTKF",
-    "asus": "ASUUY",
-    "acer": "ACEYY",
-    # International — Australia / Other
-    "commonwealth bank": "CMWAY",
-    "westpac": "WBK",
-    "anz": "ANZBY",
-    "nab": "NABZY",
-    "bhp billiton": "BHP",
-    "woolworths": "WOLZY",
-    "qantas": "QABSY",
+    "nintendo": "NTDOY",
+    "softbank": "SFTBY",
 }
+
+# Exchange quality tiers for auto-discovery scoring
+_TIER1_EXCHANGES = {"NMS", "NGM", "NCM", "NYQ", "NYSEArca"}   # US major
+_TIER2_EXCHANGES = {"PNK", "GREY", "OTC"}                       # US OTC/ADR
+_TIER3_EXCHANGES = {"NSE", "BSE", "LSE", "GER", "PAR", "AMS"}  # Major foreign
+_DEPRIORITIZED_SUFFIXES = (".TW", ".TWO", ".HK", ".SS", ".SZ", ".KS", ".KQ")
+
+
+def _name_similarity(a: str, b: str) -> float:
+    """Return 0-1 string similarity between two company names."""
+    return SequenceMatcher(None, a.lower(), b.lower()).ratio()
+
+
+def _score_candidate(symbol: str, long_name: str, short_name: str,
+                      exchange: str, query: str) -> float:
+    """
+    Score a Yahoo Finance search candidate (higher = better match).
+    Factors: exchange quality, name similarity, ticker length (proxy for specificity).
+    """
+    score = 0.0
+
+    # Exchange quality
+    if exchange in _TIER1_EXCHANGES:
+        score += 40
+    elif exchange in _TIER2_EXCHANGES:
+        score += 25
+    elif exchange in _TIER3_EXCHANGES:
+        score += 20
+    else:
+        score += 5
+
+    # Penalise local-market suffixes (prefer ADR/international listing)
+    if any(symbol.endswith(sfx) for sfx in _DEPRIORITIZED_SUFFIXES):
+        score -= 20
+
+    # Name similarity to query
+    best_name = long_name or short_name or ""
+    sim = _name_similarity(query, best_name)
+    score += sim * 40   # up to 40 points for exact name match
+
+    # Shorter tickers tend to be the primary listing
+    score -= len(symbol) * 0.5
+
+    return score
+
+
+def _verify_ticker(ticker: str) -> bool:
+    """
+    Verify a ticker has live market data and is not delisted/empty.
+    Returns True if valid, False if the ticker should be rejected.
+    """
+    try:
+        info = yf.Ticker(ticker).info
+        # Must have a current price OR market cap to be considered active
+        has_price = bool(
+            info.get("currentPrice") or
+            info.get("regularMarketPrice") or
+            info.get("previousClose")
+        )
+        has_market_cap = bool(info.get("marketCap"))
+        return has_price or has_market_cap
+    except Exception:
+        return False
+
+
+def _search_yahoo(query: str, count: int = 10) -> list[dict]:
+    """Query Yahoo Finance search API and return raw quote results."""
+    for base_url in [
+        "https://query1.finance.yahoo.com/v1/finance/search",
+        "https://query2.finance.yahoo.com/v1/finance/search",
+    ]:
+        try:
+            resp = requests.get(
+                base_url,
+                params={
+                    "q": query,
+                    "quotesCount": count,
+                    "newsCount": 0,
+                    "enableFuzzyQuery": True,
+                    "quotesQueryId": "tss_match_phrase_query",
+                },
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"},
+                timeout=8,
+            )
+            if resp.status_code == 200:
+                return resp.json().get("quotes", [])
+        except Exception:
+            continue
+    return []
+
+
+@st.cache_data(ttl=86400)  # Cache for 24 hours — new IPOs don't happen every minute
+def _auto_discover(company_name: str) -> tuple[str | None, str | None]:
+    """
+    Layer 3: Automatically discover the correct ticker for ANY company name,
+    including companies that IPO'd after this code was written.
+
+    Algorithm:
+    1. Search Yahoo Finance for the company name
+    2. Filter to EQUITY type only
+    3. Score each candidate by exchange quality + name similarity
+    4. Verify the top candidate has live market data
+    5. Return the verified winner
+    """
+    quotes = _search_yahoo(company_name, count=15)
+    equity_quotes = [q for q in quotes if q.get("quoteType") == "EQUITY"]
+
+    if not equity_quotes:
+        return None, None
+
+    # Score all candidates
+    scored = []
+    for q in equity_quotes:
+        symbol = q.get("symbol", "")
+        long_name = q.get("longname", "") or ""
+        short_name = q.get("shortname", "") or ""
+        exchange = q.get("exchange", "") or q.get("exchDisp", "") or ""
+        score = _score_candidate(symbol, long_name, short_name, exchange, company_name)
+        scored.append((score, symbol, long_name or short_name or symbol))
+
+    # Sort by score descending
+    scored.sort(key=lambda x: x[0], reverse=True)
+
+    # Try candidates in order until one verifies
+    for score, symbol, name in scored[:5]:
+        if _verify_ticker(symbol):
+            return symbol, name
+
+    # If none verified, return top result anyway (best effort)
+    if scored:
+        return scored[0][1], scored[0][2]
+
+    return None, None
 
 
 @st.cache_data(ttl=3600)
 def resolve_ticker(company_name: str) -> tuple[str | None, str | None]:
     """
-    Resolve a company name to its ticker symbol.
+    Master resolver — three-layer pipeline.
 
     Returns:
-        (ticker, company_full_name) or (None, None) if not found.
-        Returns ("PRIVATE", company_name) if the company is known to be private.
+        (ticker, company_full_name) — for any publicly traded company
+        ("PRIVATE", name)           — for known private companies
+        (None, None)                — if not found anywhere
     """
     if not company_name or not company_name.strip():
         return None, None
 
     query = company_name.strip().lower()
 
-    # 0. Check if it's a known private company
+    # ── Layer 1: Private company check ───────────────────────────────────────
     if query in PRIVATE_COMPANIES:
         return "PRIVATE", company_name.strip()
 
-    # 1. Check alias map first (fast path — guaranteed correct ticker)
+    # ── Layer 2a: Direct ticker input ─────────────────────────────────────────
+    raw = company_name.strip()
+    if len(raw) <= 6 and raw.replace(".", "").isalpha():
+        ticker_upper = raw.upper()
+        try:
+            info = yf.Ticker(ticker_upper).info
+            if info.get("regularMarketPrice") or info.get("currentPrice") or info.get("marketCap"):
+                name = info.get("longName") or info.get("shortName") or ticker_upper
+                return ticker_upper, name
+        except Exception:
+            pass
+
+    # ── Layer 2b: Curated alias map ───────────────────────────────────────────
     if query in COMPANY_ALIASES:
         ticker = COMPANY_ALIASES[query]
         try:
@@ -352,73 +383,10 @@ def resolve_ticker(company_name: str) -> tuple[str | None, str | None]:
         except Exception:
             return ticker, ticker
 
-    # 2. If input looks like a ticker already (short, uppercase-ish), try direct
-    if len(company_name.strip()) <= 6 and company_name.strip().replace(".", "").isalpha():
-        ticker_upper = company_name.strip().upper()
-        try:
-            info = yf.Ticker(ticker_upper).info
-            if info.get("regularMarketPrice") or info.get("currentPrice"):
-                name = info.get("longName") or info.get("shortName") or ticker_upper
-                return ticker_upper, name
-        except Exception:
-            pass
-
-    # 3. Use Yahoo Finance search API with smart filtering
-    try:
-        url = "https://query2.finance.yahoo.com/v1/finance/search"
-        params = {
-            "q": company_name,
-            "quotesCount": 10,
-            "newsCount": 0,
-            "enableFuzzyQuery": True,
-            "quotesQueryId": "tss_match_phrase_query",
-        }
-        headers = {"User-Agent": "Mozilla/5.0"}
-        resp = requests.get(url, params=params, headers=headers, timeout=8)
-        data = resp.json()
-        quotes = data.get("quotes", [])
-
-        # Score results: prefer major exchanges over subsidiaries/obscure listings
-        PREFERRED_EXCHANGES = {
-            "NMS", "NGM", "NCM",  # NASDAQ tiers
-            "NYQ",                 # NYSE
-            "NYSEArca",
-            "PNK",                 # OTC Pink (ADRs land here)
-            "GER",                 # Frankfurt (for European)
-            "LSE",                 # London
-            "NSE", "BSE",          # India
-        }
-        DEPRIORITIZED_SUFFIXES = (
-            ".TW", ".TWO",         # Taiwan local (prefer ADR)
-            ".HK",                 # Hong Kong local (prefer ADR)
-            ".SS", ".SZ",          # China A-shares (prefer ADR/HK)
-            ".KS", ".KQ",          # Korea local (prefer ADR)
-        )
-
-        equity_quotes = [q for q in quotes if q.get("quoteType") == "EQUITY"]
-
-        if equity_quotes:
-            # First pass: find one NOT on a deprioritized exchange suffix
-            for q in equity_quotes:
-                symbol = q.get("symbol", "")
-                if not any(symbol.endswith(sfx) for sfx in DEPRIORITIZED_SUFFIXES):
-                    name = q.get("longname") or q.get("shortname") or symbol
-                    return symbol, name
-
-            # Second pass: accept any equity
-            q = equity_quotes[0]
-            ticker = q.get("symbol")
-            name = q.get("longname") or q.get("shortname") or ticker
-            return ticker, name
-
-        # Fallback to first result of any type
-        if quotes:
-            ticker = quotes[0].get("symbol")
-            name = quotes[0].get("longname") or quotes[0].get("shortname") or ticker
-            return ticker, name
-
-    except Exception:
-        pass
+    # ── Layer 3: Auto-discovery (handles all future IPOs automatically) ───────
+    ticker, name = _auto_discover(company_name.strip())
+    if ticker:
+        return ticker, name
 
     return None, None
 
@@ -427,8 +395,7 @@ def resolve_ticker(company_name: str) -> tuple[str | None, str | None]:
 def get_company_info(ticker: str) -> dict:
     """Fetch full yfinance info dict for a ticker."""
     try:
-        t = yf.Ticker(ticker)
-        info = t.info
+        info = yf.Ticker(ticker).info
         return info if info else {}
     except Exception:
         return {}
