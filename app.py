@@ -1,3 +1,13 @@
+"""
+app.py
+------
+FinIntel AI — Financial Intelligence Platform
+Main Streamlit application entry point.
+
+Run with:
+    streamlit run app.py
+"""
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -5,6 +15,11 @@ import yfinance as yf
 import plotly.graph_objects as go
 import io
 from datetime import datetime
+
+from private_company import (
+    parse_uploaded_file,
+    get_available_statements,
+)
 
 from company_search import resolve_ticker, get_company_info
 
@@ -20,7 +35,7 @@ def _load_groq_key() -> str | None:
 
     # 1. Streamlit secrets
     try:
-        key = st.secrets["GROQ_API_KEY"]        
+        key = st.secrets["GROQ_API_KEY"]          # raises KeyError if missing
         if key and key.startswith("gsk_"):
             return key.strip()
     except Exception:
@@ -52,7 +67,7 @@ from utils import (
     fmt_large, fmt_price, fmt_pct, fmt_multiple,
     build_price_chart, build_kpi_bar_chart, build_health_radar,
     build_peer_comparison_chart, build_revenue_trend_chart,
-    kpi_card, health_badge, chart_config, layout_defaults, COLORS,
+    kpi_card, health_badge, chart_config, COLORS,
 )
 
 # ─── Page config ──────────────────────────────────────────────────────────────
@@ -254,14 +269,20 @@ if "news_refresh" not in st.session_state:
     st.session_state.news_refresh = 0
 if "cfo_brief" not in st.session_state:
     st.session_state.cfo_brief = None
+if "upload_statements" not in st.session_state:
+    st.session_state.upload_statements = None
+if "upload_company_name" not in st.session_state:
+    st.session_state.upload_company_name = None
+if "upload_peer" not in st.session_state:
+    st.session_state.upload_peer = ""
 
 
 # ─── Sidebar ──────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("""
-    <div style="padding: 8px 0 20px 0">
+    <div style="padding: 8px 0 16px 0">
         <p style="font-size:22px;font-weight:800;color:#FFFFFF;margin:0;letter-spacing:-0.5px">
-             FinIntel AI
+            📊 FinIntel AI
         </p>
         <p style="font-size:12px;color:#8E8E93;margin:4px 0 0 0;font-weight:500">
             Financial Intelligence Platform
@@ -269,48 +290,149 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown("**Search Company**")
-    search_input = st.text_input(
-        "Company name or ticker",
-        placeholder="e.g. Microsoft, Apple, TCS...",
+    # ── Mode toggle ───────────────────────────────────────────────────────────
+    st.markdown('<p style="color:#8E8E93;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px">Analysis Mode</p>', unsafe_allow_html=True)
+    app_mode = st.radio(
+        "mode",
+        ["🔍 Search Mode", "📂 Upload Mode"],
         label_visibility="collapsed",
+        horizontal=True,
     )
-
-    search_col, _ = st.columns([1, 1])
-    with search_col:
-        search_btn = st.button(" Analyze", use_container_width=True)
-
-    # Quick access companies
     st.markdown("---")
-    st.markdown('<p style="color:#8E8E93;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px">Quick Access</p>', unsafe_allow_html=True)
-    quick_companies = [
-        ("MSFT", "Microsoft"),
-        ("AAPL", "Apple"),
-        ("NVDA", "NVIDIA"),
-        ("GOOGL", "Alphabet"),
-        ("AMZN", "Amazon"),
-        ("TSLA", "Tesla"),
-        ("SAP", "SAP SE"),
-        ("TCS.NS", "TCS"),
-    ]
-    cols = st.columns(2)
-    for i, (ticker, name) in enumerate(quick_companies):
-        with cols[i % 2]:
-            if st.button(name, key=f"quick_{ticker}", use_container_width=True):
-                st.session_state.ticker = ticker
-                st.session_state.company_name = name
-                st.session_state.chat_history = []
-                st.session_state.cfo_brief = None
 
-    # AI Settings
+    # ── SEARCH MODE sidebar ───────────────────────────────────────────────────
+    if app_mode == "🔍 Search Mode":
+        st.markdown("**Search Company**")
+        search_input = st.text_input(
+            "Company name or ticker",
+            placeholder="e.g. Microsoft, Apple, TCS...",
+            label_visibility="collapsed",
+        )
+        search_col, _ = st.columns([1, 1])
+        with search_col:
+            search_btn = st.button("🔍 Analyze", use_container_width=True)
+
+        st.markdown("---")
+        st.markdown('<p style="color:#8E8E93;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px">Quick Access</p>', unsafe_allow_html=True)
+        quick_companies = [
+            ("MSFT", "Microsoft"), ("AAPL", "Apple"),
+            ("NVDA", "NVIDIA"),    ("GOOGL", "Alphabet"),
+            ("AMZN", "Amazon"),    ("TSLA", "Tesla"),
+            ("SAP", "SAP SE"),     ("TCS.NS", "TCS"),
+        ]
+        cols = st.columns(2)
+        for i, (t, name) in enumerate(quick_companies):
+            with cols[i % 2]:
+                if st.button(name, key=f"quick_{t}", use_container_width=True):
+                    st.session_state.ticker = t
+                    st.session_state.company_name = name
+                    st.session_state.chat_history = []
+                    st.session_state.cfo_brief = None
+                    st.session_state.upload_statements = None
+                    st.session_state.upload_company_name = None
+
+    # ── UPLOAD MODE sidebar ───────────────────────────────────────────────────
+    else:
+        search_input = ""
+        search_btn = False
+
+        st.markdown("**Company Name**")
+        upload_name_input = st.text_input(
+            "Company name",
+            placeholder="e.g. Acme Corp, My Division...",
+            label_visibility="collapsed",
+            key="upload_name",
+        )
+
+        st.markdown("**Upload Financials**")
+        st.markdown('<p style="color:#8E8E93;font-size:11px;margin:0 0 6px">Excel, CSV, or PDF</p>', unsafe_allow_html=True)
+        uploaded_file = st.file_uploader(
+            "financials",
+            type=["xlsx", "xls", "csv", "pdf"],
+            label_visibility="collapsed",
+        )
+
+        st.markdown("""
+        <div style="background:#0A84FF0D;border:1px solid #0A84FF33;border-radius:8px;
+                    padding:10px 12px;margin:8px 0">
+            <p style="color:#0A84FF;font-size:11px;font-weight:600;margin:0 0 4px">Excel Format</p>
+            <p style="color:#8E8E93;font-size:11px;margin:0;line-height:1.6">
+                Sheet names: Income Statement,<br>Balance Sheet, Cash Flow<br>
+                Col headers: 2022, 2023, 2024<br>
+                Row labels: Revenue, Net Income...
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        upload_btn = st.button("📂 Analyze Financials", use_container_width=True)
+
+        # Benchmark peer input
+        st.markdown("---")
+        st.markdown("**Benchmark vs Public Peer**")
+        st.markdown('<p style="color:#8E8E93;font-size:11px;margin:0 0 6px">Optional: compare against a public company</p>', unsafe_allow_html=True)
+        upload_peer_input = st.text_input(
+            "peer",
+            placeholder="e.g. Microsoft, SAP...",
+            label_visibility="collapsed",
+            key="upload_peer",
+        )
+
+        # Template download
+        st.markdown("---")
+        sample = {
+            "Income Statement": pd.DataFrame({
+                "Line Item": ["Total Revenue","Gross Profit","Operating Income","Net Income","EBITDA"],
+                "2022": [50e6,20e6,8e6,5e6,10e6],
+                "2023": [60e6,25e6,10e6,7e6,13e6],
+                "2024": [72e6,31e6,13e6,9e6,16e6],
+            }),
+            "Balance Sheet": pd.DataFrame({
+                "Line Item": ["Total Current Assets","Total Assets","Total Current Liabilities","Total Debt","Total Stockholder Equity"],
+                "2022": [15e6,45e6,8e6,12e6,25e6],
+                "2023": [18e6,52e6,9e6,10e6,30e6],
+                "2024": [22e6,61e6,10e6,8e6,37e6],
+            }),
+            "Cash Flow": pd.DataFrame({
+                "Line Item": ["Operating Cash Flow","Capital Expenditure","Free Cash Flow"],
+                "2022": [8e6,-2e6,6e6],
+                "2023": [11e6,-3e6,8e6],
+                "2024": [14e6,-3.5e6,10.5e6],
+            }),
+        }
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+            for sn, df in sample.items():
+                df.to_excel(writer, sheet_name=sn, index=False)
+        buf.seek(0)
+        st.download_button(
+            "⬇ Download Excel Template",
+            data=buf.getvalue(),
+            file_name="FinIntel_Template.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+
+        # Handle upload button
+        if upload_btn and uploaded_file:
+            with st.spinner("Parsing..."):
+                stmts, detected = parse_uploaded_file(uploaded_file)
+                uname = upload_name_input.strip() or detected or "My Company"
+                avail = get_available_statements(stmts)
+            if avail:
+                st.session_state.upload_statements = stmts
+                st.session_state.upload_company_name = uname
+                st.session_state.upload_peer = upload_peer_input.strip()
+                st.session_state.ticker = None  # clear search mode
+                st.success(f"Parsed: {', '.join(avail)}")
+            else:
+                st.error("Could not extract data. Check row labels and year columns.")
+        elif upload_btn and not uploaded_file:
+            st.warning("Please upload a file first.")
+
+    # ── AI Settings (both modes) ──────────────────────────────────────────────
     st.markdown("---")
     st.markdown('<p style="color:#8E8E93;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px">AI Settings</p>', unsafe_allow_html=True)
-
-    # Try to load key from secrets/env first
     _server_key = _load_groq_key()
-
     if _server_key:
-        # Key is embedded — AI is on for everyone, no input needed
         groq_key = _server_key
         st.markdown("""
         <div style="background:#34C75911;border:1px solid #34C75933;border-radius:8px;padding:10px 12px">
@@ -319,8 +441,6 @@ with st.sidebar:
         </div>
         """, unsafe_allow_html=True)
     else:
-        # No server key — show optional override input
-        st.markdown('<p style="color:#8E8E93;font-size:11px;margin:0 0 6px">Optional: add your own Groq key for AI features</p>', unsafe_allow_html=True)
         groq_key = st.text_input(
             "Groq API Key",
             type="password",
@@ -355,14 +475,281 @@ if search_btn and search_input.strip():
     with st.spinner(f"Identifying {search_input}..."):
         ticker, full_name = resolve_ticker(search_input.strip())
     if ticker == "PRIVATE":
-        st.error(f"**{search_input}** is a privately held company and is not listed on any public stock exchange. FinIntel AI analyzes publicly traded companies only.")
+        st.error(f"**{search_input}** is a privately held company. Switch to Upload Mode to analyze private financials.")
     elif ticker:
         st.session_state.ticker = ticker
         st.session_state.company_name = full_name
         st.session_state.chat_history = []
         st.session_state.cfo_brief = None
+        st.session_state.upload_statements = None
     else:
-        st.error(f"Could not identify a publicly traded company for **{search_input}**. Try a ticker symbol directly (e.g. NSANY for Nissan, HMC for Honda).")
+        st.error(f"Could not identify a publicly traded company for **{search_input}**. Try a ticker directly.")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# UPLOAD MODE DASHBOARD
+# ══════════════════════════════════════════════════════════════════════════════
+if app_mode == "📂 Upload Mode":
+    if not st.session_state.upload_statements:
+        # Upload mode landing
+        st.markdown("""
+        <div style="text-align:center;padding:60px 20px 30px">
+            <p style="font-size:48px;margin:0">📂</p>
+            <h1 style="font-size:32px;font-weight:800;color:#FFFFFF;margin:12px 0 8px">Upload Mode</h1>
+            <p style="font-size:16px;color:#8E8E93;margin:0 0 12px;max-width:500px;display:inline-block">
+                Analyze any company's internal financials. Public or private,<br>
+                listed or unlisted — if you have the numbers, we can analyze them.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        use_cols = st.columns(3)
+        use_cases = [
+            ("🏢", "Public Companies", "Analyze internal divisions, management accounts, or unreported segment data not in public filings."),
+            ("🔒", "Private Companies", "Get the same KPIs, health score, and CFO Brief as any public company — from your own data."),
+            ("📊", "Any Organization", "Startups, nonprofits, subsidiaries, joint ventures. If it has a P&L, this works."),
+        ]
+        for col, (icon, title, desc) in zip(use_cols, use_cases):
+            with col:
+                st.markdown(f"""
+                <div style="background:#1C1C1E;border:1px solid #2C2C2E;border-radius:14px;
+                            padding:20px;text-align:center;min-height:140px">
+                    <p style="font-size:28px;margin:0 0 8px">{icon}</p>
+                    <p style="font-size:14px;font-weight:700;color:#FFFFFF;margin:0 0 6px">{title}</p>
+                    <p style="font-size:12px;color:#8E8E93;margin:0;line-height:1.5">{desc}</p>
+                </div>
+                """, unsafe_allow_html=True)
+
+        st.markdown("""
+        <p style="text-align:center;color:#48484A;font-size:13px;margin-top:24px">
+            Upload your file and click Analyze Financials in the sidebar to begin
+        </p>
+        """, unsafe_allow_html=True)
+        st.stop()
+
+    # ── Upload mode has data — run full analysis ──────────────────────────────
+    stmts = st.session_state.upload_statements
+    uname = st.session_state.upload_company_name
+    upeer = st.session_state.upload_peer
+
+    u_kpis = calculate_kpis(stmts["income"], stmts["balance"], stmts["cashflow"], {})
+    u_score, u_label, u_breakdown = calculate_health_score(u_kpis, {})
+
+    # Header
+    st.markdown(f"""
+    <div style="display:flex;align-items:center;justify-content:space-between;
+        padding:20px 0 16px;border-bottom:1px solid #1C1C1E;margin-bottom:20px;flex-wrap:wrap;gap:16px">
+        <div>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+                <h1 style="font-size:28px;font-weight:800;color:#FFFFFF;margin:0">{uname}</h1>
+                <span style="background:#1C1C1E;border:1px solid #2C2C2E;border-radius:6px;
+                             padding:3px 10px;font-size:12px;color:#8E8E93;font-weight:600">UPLOADED</span>
+            </div>
+            <p style="color:#8E8E93;font-size:13px;margin:0">Internal financial data · Confidential analysis</p>
+        </div>
+        <div style="text-align:right">
+            <p style="font-size:14px;color:#8E8E93;margin:0">Financial Health</p>
+            <p style="font-size:32px;font-weight:800;color:{'#34C759' if u_score>=75 else '#0A84FF' if u_score>=55 else '#FF9F0A' if u_score>=35 else '#FF3B30'};margin:0">{u_score}/100</p>
+            <p style="color:#8E8E93;font-size:13px;margin:0">{u_label}</p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # KPI strip
+    strip_data = [
+        ("Revenue Growth", u_kpis.get("Revenue Growth %",(None,"N/A"))[1]),
+        ("Gross Margin",   u_kpis.get("Gross Margin %",(None,"N/A"))[1]),
+        ("Net Margin",     u_kpis.get("Net Margin %",(None,"N/A"))[1]),
+        ("Current Ratio",  u_kpis.get("Current Ratio",(None,"N/A"))[1]),
+        ("Debt-to-Equity", u_kpis.get("Debt-to-Equity",(None,"N/A"))[1]),
+    ]
+    for col, (label, val) in zip(st.columns(5), strip_data):
+        col.metric(label, val)
+
+    st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+
+    # Tabs for upload mode
+    u_tabs = st.tabs(["📋 Financials", "🎯 KPIs & Health", "💡 Insights", "📄 CFO Brief", "🏆 Peer Compare"])
+
+    # ── U-Tab 1: Financials ───────────────────────────────────────────────────
+    with u_tabs[0]:
+        st.markdown("**Uploaded Financial Statements**")
+        stmt_map = {"Income Statement": "income", "Balance Sheet": "balance", "Cash Flow": "cashflow"}
+        avail_stmts = [k for k, v in stmt_map.items() if not stmts[v].empty]
+        if avail_stmts:
+            for tab, label in zip(st.tabs(avail_stmts), avail_stmts):
+                with tab:
+                    df = stmts[stmt_map[label]]
+                    def fmt_u(x):
+                        try:
+                            v = float(x)
+                            if abs(v) >= 1e9: return f"${v/1e9:,.2f}B"
+                            if abs(v) >= 1e6: return f"${v/1e6:,.1f}M"
+                            if abs(v) >= 1e3: return f"${v/1e3:,.0f}K"
+                            return f"${v:,.0f}"
+                        except: return "—"
+                    try:
+                        display_df = df.map(fmt_u)
+                    except AttributeError:
+                        display_df = df.applymap(fmt_u)
+                    st.dataframe(display_df, use_container_width=True)
+                    csv_buf = io.StringIO()
+                    df.to_csv(csv_buf)
+                    st.download_button(f"⬇ Download {label} CSV", csv_buf.getvalue(),
+                                       f"{uname}_{label}.csv", "text/csv", key=f"u_dl_{label}")
+
+    # ── U-Tab 2: KPIs & Health ────────────────────────────────────────────────
+    with u_tabs[1]:
+        sc, rc = st.columns([1,1])
+        with sc:
+            st.markdown("**Financial Health Score**")
+            st.markdown(health_badge(u_label, u_score), unsafe_allow_html=True)
+            st.markdown("**Score Breakdown**")
+            for dim, score in u_breakdown.items():
+                pct = score / 20
+                color = (COLORS["success"] if pct>=0.75 else COLORS["primary"] if pct>=0.50
+                         else COLORS["warning"] if pct>=0.25 else COLORS["danger"])
+                st.markdown(f"""
+                <div style="margin-bottom:10px">
+                    <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+                        <span style="color:#FFFFFF;font-size:13px">{dim}</span>
+                        <span style="color:{color};font-size:13px;font-weight:600">{score}/20</span>
+                    </div>
+                    <div style="background:#2C2C2E;border-radius:4px;height:6px">
+                        <div style="background:{color};border-radius:4px;height:6px;width:{pct*100:.0f}%"></div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+        with rc:
+            st.markdown("**Dimension Radar**")
+            st.plotly_chart(build_health_radar(u_breakdown), use_container_width=True, config=chart_config())
+
+        st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+        st.markdown("**Key Performance Indicators**")
+        kpi_groups = {
+            "Profitability": ["Revenue Growth %","Gross Margin %","Operating Margin %","Net Margin %","EBITDA Margin %"],
+            "Efficiency": ["ROA %","ROE %","FCF Margin %"],
+            "Liquidity & Leverage": ["Current Ratio","Quick Ratio","Debt-to-Equity"],
+        }
+        for group_name, kpi_names in kpi_groups.items():
+            st.markdown(f"**{group_name}**")
+            cols = st.columns(len(kpi_names))
+            for col, kn in zip(cols, kpi_names):
+                _, fmt_str, delta = u_kpis.get(kn, (None,"N/A",None))
+                col.metric(kn, fmt_str)
+
+        st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+        st.markdown("**Margin Profile**")
+        mc = build_kpi_bar_chart(u_kpis)
+        if mc.data:
+            st.plotly_chart(mc, use_container_width=True, config=chart_config())
+
+    # ── U-Tab 3: Insights ─────────────────────────────────────────────────────
+    with u_tabs[2]:
+        st.markdown("**Executive Insights**")
+        with st.spinner("Generating insights..."):
+            u_insights = generate_executive_insights(
+                uname, "UPLOAD", u_kpis, u_score, u_label, {},
+                api_key=groq_key or None,
+            )
+        icons = {"Revenue Trend":"📈","Profitability Trend":"💰",
+                 "Balance Sheet Strength":"🏦","Cash Flow Analysis":"💸"}
+        for title, text in u_insights.items():
+            st.markdown(f"""
+            <div class="insight-card">
+                <p style="color:#0A84FF;font-size:11px;text-transform:uppercase;
+                          letter-spacing:0.8px;font-weight:700;margin:0 0 6px">{icons.get(title,"📊")} {title}</p>
+                <p style="color:#FFFFFF;font-size:14px;line-height:1.6;margin:0">{text}</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+    # ── U-Tab 4: CFO Brief ────────────────────────────────────────────────────
+    with u_tabs[3]:
+        st.markdown("**CFO Brief Generator**")
+        st.markdown('<p style="color:#8E8E93;font-size:13px">Generate a structured executive brief from your uploaded financials.</p>', unsafe_allow_html=True)
+        if st.button("📄 Generate CFO Brief", key="u_cfo_btn"):
+            with st.spinner("Compiling CFO Brief..."):
+                u_brief = generate_cfo_brief(
+                    uname, "UPLOAD", {}, u_kpis, u_score, u_label, [],
+                    api_key=groq_key or None,
+                )
+            st.markdown(f'<div style="background:#1C1C1E;border:1px solid #2C2C2E;border-radius:12px;padding:24px">{u_brief}</div>', unsafe_allow_html=True)
+            st.download_button("⬇ Download CFO Brief", u_brief,
+                               f"{uname}_CFO_Brief_{datetime.now().strftime('%Y%m%d')}.md",
+                               "text/markdown", key="u_dl_brief")
+
+    # ── U-Tab 5: Peer Compare ─────────────────────────────────────────────────
+    with u_tabs[4]:
+        st.markdown("**Peer Comparison**")
+        peer_query = upeer or st.text_input("Enter a public company to benchmark against",
+                                             placeholder="Microsoft, SAP, Apple...",
+                                             key="u_peer_inline")
+        if peer_query:
+            with st.spinner(f"Loading {peer_query} data..."):
+                pt, pname = resolve_ticker(peer_query)
+            if pt and pt != "PRIVATE":
+                p_info  = get_company_info(pt)
+                p_kpis  = calculate_kpis(get_income_statement(pt), get_balance_sheet(pt), get_cash_flow(pt), p_info)
+                p_score, p_label, _ = calculate_health_score(p_kpis, p_info)
+
+                # Table
+                compare_metrics = ["Revenue Growth %","Gross Margin %","Net Margin %",
+                                   "Operating Margin %","ROE %","Current Ratio","Debt-to-Equity","FCF Margin %"]
+                rows = [{"Metric": m,
+                         uname: u_kpis.get(m,(None,"N/A"))[1],
+                         pname: p_kpis.get(m,(None,"N/A"))[1]}
+                        for m in compare_metrics]
+                st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
+                # Bar chart
+                margin_metrics = ["Gross Margin %","Operating Margin %","Net Margin %","FCF Margin %"]
+                labels, uvals, pvals = [], [], []
+                for m in margin_metrics:
+                    uv = u_kpis.get(m,(None,))[0]
+                    pv = p_kpis.get(m,(None,))[0]
+                    if uv is not None and pv is not None:
+                        labels.append(m.replace(" %",""))
+                        uvals.append(uv)
+                        pvals.append(pv)
+                if labels:
+                    fig = go.Figure()
+                    fig.add_trace(go.Bar(name=uname, x=labels, y=uvals,
+                                         marker_color=COLORS["primary"],
+                                         text=[f"{v:.1f}%" for v in uvals], textposition="outside"))
+                    fig.add_trace(go.Bar(name=pname, x=labels, y=pvals,
+                                         marker_color=COLORS["neutral"],
+                                         text=[f"{v:.1f}%" for v in pvals], textposition="outside"))
+                    fig.update_layout(
+                        title="Margin Comparison",
+                        height=350,
+                        barmode="group",
+                        yaxis=dict(ticksuffix="%"),
+                        plot_bgcolor="rgba(0,0,0,0)",
+                        paper_bgcolor="rgba(0,0,0,0)",
+                        font=dict(color="#FFFFFF"),
+                    )
+                    st.plotly_chart(fig, use_container_width=True, config=chart_config())
+
+                # Health score cards
+                h1, h2 = st.columns(2)
+                for col, name, sc, lb in [(h1,uname,u_score,u_label),(h2,pname,p_score,p_label)]:
+                    hc = (COLORS["success"] if sc>=75 else COLORS["primary"] if sc>=55
+                          else COLORS["warning"] if sc>=35 else COLORS["danger"])
+                    with col:
+                        st.markdown(f"""
+                        <div style="background:#1C1C1E;border:1px solid #2C2C2E;border-radius:12px;
+                                    padding:20px;text-align:center">
+                            <p style="color:#8E8E93;font-size:12px;margin:0 0 8px">{name}</p>
+                            <p style="font-size:40px;font-weight:800;color:{hc};margin:0">{sc}</p>
+                            <p style="color:{hc};font-size:14px;font-weight:600;margin:4px 0 0">{lb}</p>
+                        </div>
+                        """, unsafe_allow_html=True)
+            else:
+                st.warning(f"Could not find '{peer_query}'. Try a ticker like MSFT or AAPL.")
+        else:
+            st.info("Enter a public company name above to benchmark your financials against it.")
+
+    st.stop()  # Don't render search mode dashboard in upload mode
 
 
 # ─── Landing page (no company selected) ───────────────────────────────────────
@@ -486,13 +873,14 @@ st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
 # ─── Navigation tabs ───────────────────────────────────────────────────────────
 tabs = st.tabs([
-    " Price & Charts",
-    " Financials",
-    " KPIs & Health",
-    " Insights",
-    " News",
-    " AI Copilot",
-    " Peer Compare",
+    "📈 Price & Charts",
+    "📋 Financials",
+    "🎯 KPIs & Health",
+    "💡 Insights",
+    "📰 News",
+    "🤖 AI Copilot",
+    "🏆 Peer Compare",
+    "🔒 Private Co. Analysis",
 ])
 
 
@@ -704,7 +1092,7 @@ with tabs[3]:
 
     gen_col, _ = st.columns([1, 3])
     with gen_col:
-        if st.button(" Generate CFO Brief", use_container_width=True):
+        if st.button("📄 Generate CFO Brief", use_container_width=True):
             with st.spinner("Compiling CFO Brief..."):
                 news_items = get_company_news(ticker, full_name, limit=8)
                 st.session_state.cfo_brief = generate_cfo_brief(
@@ -747,7 +1135,7 @@ with tabs[4]:
             unsafe_allow_html=True,
         )
     with refresh_col:
-        if st.button(" Refresh News"):
+        if st.button("🔄 Refresh News"):
             st.session_state.news_refresh += 1
             get_company_news.clear()
 
@@ -773,7 +1161,7 @@ with tabs[4]:
                     <span style="background:#2C2C2E;border-radius:5px;
                                  padding:2px 8px;font-size:11px;color:#8E8E93;
                                  font-weight:500">{publisher}</span>
-                    <span style="color:#48484A;font-size:12px"> {pub_date}</span>
+                    <span style="color:#48484A;font-size:12px">📅 {pub_date}</span>
                     <a href="{link}" target="_blank" style="color:#0A84FF;
                        font-size:12px;text-decoration:none;margin-left:auto">Read →</a>
                 </div>
@@ -799,7 +1187,7 @@ with tabs[5]:
             <div style="background:#FF9F0A11;border:1px solid #FF9F0A33;
                          border-radius:10px;padding:12px 16px;margin-bottom:16px">
                 <p style="color:#FF9F0A;font-size:13px;margin:0;font-weight:500">
-                     Add your Groq API key in the sidebar for full AI responses.
+                    💡 Add your Groq API key in the sidebar for full AI responses.
                     Rule-based answers available without a key.
                 </p>
             </div>
@@ -1036,10 +1424,283 @@ with tabs[6]:
                 textposition="outside",
                 textfont=dict(color=COLORS["text"], size=12),
             ))
-            layout = layout_defaults(f"{chart_metric} Comparison", height=350)
-            layout["yaxis"]["ticksuffix"] = suffix
-            layout["showlegend"] = False
-            fig.update_layout(**layout)
+            fig.update_layout(
+                title=f"{chart_metric} Comparison",
+                height=350,
+                yaxis=dict(ticksuffix=suffix),
+                showlegend=False,
+                plot_bgcolor="rgba(0,0,0,0)",
+                paper_bgcolor="rgba(0,0,0,0)",
+                font=dict(color="#FFFFFF"),
+            )
             st.plotly_chart(fig, use_container_width=True, config=chart_config())
         else:
             st.info("Chart data not available for selected metric.")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 8: PRIVATE COMPANY ANALYSIS
+# ══════════════════════════════════════════════════════════════════════════════
+with tabs[7]:
+    st.markdown("**Private Company Financial Analysis**")
+    st.markdown(
+        '<p style="color:#8E8E93;font-size:13px">Upload your financials to get KPI analysis, '
+        'health scoring, AI insights, CFO Brief, and peer benchmarking against any public company.</p>',
+        unsafe_allow_html=True,
+    )
+
+    st.markdown("""
+    <div style="background:#1C1C1E;border:1px solid #2C2C2E;border-radius:12px;padding:20px;margin-bottom:20px">
+        <p style="color:#FFFFFF;font-size:14px;font-weight:600;margin:0 0 8px">Supported Formats</p>
+        <p style="color:#8E8E93;font-size:13px;margin:0;line-height:1.8">
+            <b style="color:#34C759">Excel (.xlsx)</b> — Name sheets: "Income Statement", "Balance Sheet", "Cash Flow"<br>
+            <b style="color:#34C759">CSV (.csv)</b> — Single statement, first column as row labels, year columns as headers<br>
+            <b style="color:#34C759">PDF (.pdf)</b> — Text-based annual reports with financial tables
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    priv_left, priv_right = st.columns([1, 1])
+    with priv_left:
+        company_name_input = st.text_input("Company Name", placeholder="e.g. Acme Corp")
+        uploaded_file = st.file_uploader(
+            "Upload Financial Statements",
+            type=["xlsx", "xls", "csv", "pdf"],
+        )
+    with priv_right:
+        st.markdown("**Benchmark Against a Public Peer**")
+        peer_input = st.text_input("Public company to compare against", placeholder="e.g. Microsoft, SAP")
+        st.markdown("""
+        <div style="background:#0A84FF0D;border:1px solid #0A84FF33;border-radius:10px;padding:14px;margin-top:8px">
+            <p style="color:#0A84FF;font-size:12px;font-weight:600;margin:0 0 6px">Excel Format Tips</p>
+            <p style="color:#8E8E93;font-size:12px;margin:0;line-height:1.6">
+                First column: line item names (Revenue, Net Income, etc.)<br>
+                Column headers: fiscal years (2022, 2023, 2024)<br>
+                Values: actual units or millions — app auto-detects scale<br>
+                Negatives: use minus sign or parentheses like (1,234)
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    analyze_priv_btn = st.button("Analyze Private Company", key="priv_analyze")
+
+    if uploaded_file and analyze_priv_btn:
+        with st.spinner("Parsing financial statements..."):
+            statements, detected_name = parse_uploaded_file(uploaded_file)
+            priv_name = company_name_input.strip() or detected_name or "Private Company"
+            available = get_available_statements(statements)
+
+        if not available:
+            st.error("Could not extract financial data. Check that rows are labeled (Revenue, Net Income, Total Assets) and columns are years (2022, 2023, 2024).")
+        else:
+            st.success(f"Parsed: {', '.join(available)} for **{priv_name}**")
+            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+
+            priv_kpis = calculate_kpis(statements["income"], statements["balance"], statements["cashflow"], {})
+            priv_score, priv_label, priv_breakdown = calculate_health_score(priv_kpis, {})
+
+            # Health Score
+            score_col, radar_col = st.columns([1, 1])
+            with score_col:
+                st.markdown(f"**Financial Health Score**")
+                st.markdown(health_badge(priv_label, priv_score), unsafe_allow_html=True)
+                for dim, score in priv_breakdown.items():
+                    pct = score / 20
+                    color = (COLORS["success"] if pct >= 0.75 else COLORS["primary"] if pct >= 0.50
+                             else COLORS["warning"] if pct >= 0.25 else COLORS["danger"])
+                    st.markdown(f"""
+                    <div style="margin-bottom:10px">
+                        <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+                            <span style="color:#FFFFFF;font-size:13px">{dim}</span>
+                            <span style="color:{color};font-size:13px;font-weight:600">{score}/20</span>
+                        </div>
+                        <div style="background:#2C2C2E;border-radius:4px;height:6px">
+                            <div style="background:{color};border-radius:4px;height:6px;width:{pct*100:.0f}%"></div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+            with radar_col:
+                st.markdown("**Dimension Radar**")
+                st.plotly_chart(build_health_radar(priv_breakdown), use_container_width=True, config=chart_config())
+
+            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+
+            # KPIs
+            st.markdown("**Key Performance Indicators**")
+            kpi_groups = {
+                "Profitability": ["Revenue Growth %", "Gross Margin %", "Operating Margin %", "Net Margin %"],
+                "Efficiency": ["ROA %", "ROE %", "FCF Margin %"],
+                "Liquidity & Leverage": ["Current Ratio", "Quick Ratio", "Debt-to-Equity"],
+            }
+            for group_name, kpi_names in kpi_groups.items():
+                st.markdown(f"**{group_name}**")
+                cols = st.columns(len(kpi_names))
+                for col, kpi_name in zip(cols, kpi_names):
+                    _, fmt_str, _ = priv_kpis.get(kpi_name, (None, "N/A", None))
+                    col.metric(kpi_name, fmt_str)
+
+            # Statements
+            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+            st.markdown("**Financial Statements**")
+            stmt_map = {"Income Statement": "income", "Balance Sheet": "balance", "Cash Flow": "cashflow"}
+            stmt_tab_labels = [s for s in stmt_map if s in available]
+            if stmt_tab_labels:
+                stmt_tabs_priv = st.tabs(stmt_tab_labels)
+                for tab, label in zip(stmt_tabs_priv, stmt_tab_labels):
+                    with tab:
+                        df = statements[stmt_map[label]]
+                        if not df.empty:
+                            def fmt_priv(x):
+                                try:
+                                    v = float(x)
+                                    if abs(v) >= 1e9: return f"${v/1e9:,.2f}B"
+                                    if abs(v) >= 1e6: return f"${v/1e6:,.1f}M"
+                                    return f"${v:,.0f}"
+                                except: return "—"
+                            try:
+                                display_df = df.map(fmt_priv)
+                            except AttributeError:
+                                display_df = df.applymap(fmt_priv)
+                            st.dataframe(display_df, use_container_width=True)
+                            csv_buf = io.StringIO()
+                            df.to_csv(csv_buf)
+                            st.download_button(f"Download {label} CSV", csv_buf.getvalue(),
+                                               f"{priv_name}_{label}.csv", "text/csv", key=f"dl_{label}")
+
+            # Insights
+            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+            st.markdown("**Executive Insights**")
+            with st.spinner("Generating insights..."):
+                priv_insights = generate_executive_insights(
+                    priv_name, "PRIVATE", priv_kpis, priv_score, priv_label, {},
+                    api_key=groq_key or None,
+                )
+            icons = {"Revenue Trend": "📈", "Profitability Trend": "💰",
+                     "Balance Sheet Strength": "🏦", "Cash Flow Analysis": "💸"}
+            for title, text in priv_insights.items():
+                st.markdown(f"""
+                <div class="insight-card">
+                    <p style="color:#0A84FF;font-size:11px;text-transform:uppercase;
+                              letter-spacing:0.8px;font-weight:700;margin:0 0 6px">{icons.get(title,"📊")} {title}</p>
+                    <p style="color:#FFFFFF;font-size:14px;line-height:1.6;margin:0">{text}</p>
+                </div>
+                """, unsafe_allow_html=True)
+
+            # CFO Brief
+            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+            if st.button("Generate CFO Brief", key="priv_cfo"):
+                with st.spinner("Compiling CFO Brief..."):
+                    priv_brief = generate_cfo_brief(
+                        priv_name, "PRIVATE", {}, priv_kpis, priv_score, priv_label, [],
+                        api_key=groq_key or None,
+                    )
+                st.markdown(f'<div style="background:#1C1C1E;border:1px solid #2C2C2E;border-radius:12px;padding:24px">{priv_brief}</div>', unsafe_allow_html=True)
+                st.download_button("Download CFO Brief", priv_brief,
+                                   f"{priv_name}_CFO_Brief.md", "text/markdown", key="priv_dl_brief")
+
+            # Peer comparison
+            if peer_input.strip():
+                st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+                st.markdown(f"**Peer Comparison: {priv_name} vs {peer_input}**")
+                with st.spinner("Loading peer data..."):
+                    peer_ticker, peer_full_name = resolve_ticker(peer_input.strip())
+                if peer_ticker and peer_ticker != "PRIVATE":
+                    peer_info = get_company_info(peer_ticker)
+                    peer_kpis = calculate_kpis(
+                        get_income_statement(peer_ticker),
+                        get_balance_sheet(peer_ticker),
+                        get_cash_flow(peer_ticker),
+                        peer_info,
+                    )
+                    # Comparison table
+                    compare_metrics = ["Revenue Growth %","Gross Margin %","Net Margin %",
+                                       "Operating Margin %","ROE %","Current Ratio","Debt-to-Equity","FCF Margin %"]
+                    rows = [{"Metric": m,
+                             priv_name: priv_kpis.get(m,(None,"N/A"))[1],
+                             peer_full_name: peer_kpis.get(m,(None,"N/A"))[1]}
+                            for m in compare_metrics]
+                    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
+                    # Margin bar chart
+                    margin_metrics = ["Gross Margin %","Operating Margin %","Net Margin %","FCF Margin %"]
+                    labels, pvals, bvals = [], [], []
+                    for m in margin_metrics:
+                        pv = priv_kpis.get(m,(None,))[0]
+                        bv = peer_kpis.get(m,(None,))[0]
+                        if pv is not None and bv is not None:
+                            labels.append(m.replace(" %",""))
+                            pvals.append(pv)
+                            bvals.append(bv)
+                    if labels:
+                        fig = go.Figure()
+                        fig.add_trace(go.Bar(name=priv_name, x=labels, y=pvals,
+                                             marker_color=COLORS["primary"],
+                                             text=[f"{v:.1f}%" for v in pvals], textposition="outside"))
+                        fig.add_trace(go.Bar(name=peer_full_name, x=labels, y=bvals,
+                                             marker_color=COLORS["neutral"],
+                                             text=[f"{v:.1f}%" for v in bvals], textposition="outside"))
+                        fig.update_layout(
+                            title="Margin Comparison",
+                            height=350,
+                            barmode="group",
+                            yaxis=dict(ticksuffix="%"),
+                            plot_bgcolor="rgba(0,0,0,0)",
+                            paper_bgcolor="rgba(0,0,0,0)",
+                            font=dict(color="#FFFFFF"),
+                        )
+                        st.plotly_chart(fig, use_container_width=True, config=chart_config())
+
+                    # Health score side by side
+                    pub_score, pub_label, _ = calculate_health_score(peer_kpis, peer_info)
+                    h1, h2 = st.columns(2)
+                    for col, name, sc, lb in [(h1, priv_name, priv_score, priv_label),
+                                               (h2, peer_full_name, pub_score, pub_label)]:
+                        hc = (COLORS["success"] if sc>=75 else COLORS["primary"] if sc>=55
+                              else COLORS["warning"] if sc>=35 else COLORS["danger"])
+                        with col:
+                            st.markdown(f"""
+                            <div style="background:#1C1C1E;border:1px solid #2C2C2E;border-radius:12px;
+                                        padding:20px;text-align:center">
+                                <p style="color:#8E8E93;font-size:12px;margin:0 0 8px">{name}</p>
+                                <p style="font-size:40px;font-weight:800;color:{hc};margin:0">{sc}</p>
+                                <p style="color:{hc};font-size:14px;font-weight:600;margin:4px 0 0">{lb}</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+                else:
+                    st.warning(f"Could not find '{peer_input}'. Try a ticker like MSFT or AAPL.")
+
+    elif not uploaded_file:
+        # Sample template download
+        st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+        st.markdown("**No file yet? Download a pre-formatted Excel template:**")
+        sample = {
+            "Income Statement": pd.DataFrame({
+                "Line Item": ["Total Revenue","Gross Profit","Operating Income","Net Income","EBITDA"],
+                "2022": [50e6, 20e6, 8e6, 5e6, 10e6],
+                "2023": [60e6, 25e6, 10e6, 7e6, 13e6],
+                "2024": [72e6, 31e6, 13e6, 9e6, 16e6],
+            }),
+            "Balance Sheet": pd.DataFrame({
+                "Line Item": ["Total Current Assets","Total Assets","Total Current Liabilities","Total Debt","Total Stockholder Equity"],
+                "2022": [15e6, 45e6, 8e6, 12e6, 25e6],
+                "2023": [18e6, 52e6, 9e6, 10e6, 30e6],
+                "2024": [22e6, 61e6, 10e6, 8e6, 37e6],
+            }),
+            "Cash Flow": pd.DataFrame({
+                "Line Item": ["Operating Cash Flow","Capital Expenditure","Free Cash Flow"],
+                "2022": [8e6, -2e6, 6e6],
+                "2023": [11e6, -3e6, 8e6],
+                "2024": [14e6, -3.5e6, 10.5e6],
+            }),
+        }
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine="openpyxl") as writer:
+            for sheet_name, df in sample.items():
+                df.to_excel(writer, sheet_name=sheet_name, index=False)
+        output.seek(0)
+        st.download_button(
+            "Download Excel Template",
+            data=output.getvalue(),
+            file_name="FinIntel_Private_Company_Template.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
