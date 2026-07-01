@@ -1,13 +1,3 @@
-"""
-app.py
-------
-FinIntel AI — Financial Intelligence Platform
-Main Streamlit application entry point.
-
-Run with:
-    streamlit run app.py
-"""
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -16,37 +6,7 @@ import plotly.graph_objects as go
 import io
 from datetime import datetime
 
-from private_company import (
-    parse_uploaded_file,
-    get_available_statements,
-)
-
 from company_search import resolve_ticker, get_company_info
-
-# ─── Load Groq API key (secrets → env → sidebar input, in that order) ─────────
-def _load_groq_key() -> str | None:
-    """
-    Priority order:
-    1. Streamlit secrets  — .streamlit/secrets.toml (local) or Secrets panel (Cloud)
-    2. Environment variable GROQ_API_KEY
-    Returns None if no valid key found anywhere.
-    """
-    import os
-
-    # 1. Streamlit secrets
-    try:
-        key = st.secrets["GROQ_API_KEY"]          # raises KeyError if missing
-        if key and key.startswith("gsk_"):
-            return key.strip()
-    except Exception:
-        pass
-
-    # 2. Environment variable
-    key = os.environ.get("GROQ_API_KEY", "").strip()
-    if key and key.startswith("gsk_"):
-        return key
-
-    return None
 from financials import (
     get_income_statement,
     get_balance_sheet,
@@ -68,12 +28,81 @@ from utils import (
     build_price_chart, build_kpi_bar_chart, build_health_radar,
     build_peer_comparison_chart, build_revenue_trend_chart,
     kpi_card, health_badge, chart_config, COLORS,
+    layout_defaults,
 )
+from private_company import parse_uploaded_file, get_available_statements
+from ipo_tracker import IPO_DATABASE, fetch_ipo_performance, get_ipo_stats
+from survival_predictor import predict_survival
+
+# ─── Load Groq API key ────────────────────────────────────────────────────────
+def _load_groq_key() -> str | None:
+    import os
+    try:
+        key = st.secrets["GROQ_API_KEY"]
+        if key and key.startswith("gsk_"):
+            return key.strip()
+    except Exception:
+        pass
+    key = os.environ.get("GROQ_API_KEY", "").strip()
+    if key and key.startswith("gsk_"):
+        return key
+    return None
+
+# ─── Load Finnhub API key ─────────────────────────────────────────────────────
+def _load_finnhub_key() -> str | None:
+    import os
+    try:
+        key = st.secrets["FINNHUB_API_KEY"]
+        if key:
+            return key.strip()
+    except Exception:
+        pass
+    key = os.environ.get("FINNHUB_API_KEY", "").strip()
+    return key or None
+
+@st.cache_data(ttl=1800)
+def get_ipo_data(finnhub_key: str | None, days_back: int = 60, days_ahead: int = 21) -> dict:
+    today = datetime.now().date()
+    recent_cutoff = today - pd.Timedelta(days=days_back)
+    upcoming_cutoff = today + pd.Timedelta(days=days_ahead)
+    recent = []
+    upcoming = []
+
+    for ticker, name, ipo_type, ipo_date, ipo_price, exchange in IPO_DATABASE:
+        try:
+            ipo_dt = datetime.strptime(ipo_date, "%Y-%m-%d").date()
+        except Exception:
+            continue
+
+        item = {
+            "ticker": ticker,
+            "name": name,
+            "date": ipo_date,
+            "offer_price": ipo_price,
+            "exchange": exchange,
+            "current_price": None,
+            "return_pct": None,
+            "total_value": None,
+        }
+        if recent_cutoff <= ipo_dt <= today:
+            recent.append(item)
+        elif today < ipo_dt <= upcoming_cutoff:
+            upcoming.append(item)
+
+    return {
+        "recent": recent,
+        "upcoming": upcoming,
+        "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    }
+
+@st.cache_data(ttl=1800)
+def get_ipo_data_no_key(days_back: int = 60) -> dict:
+    return get_ipo_data(None, days_back=days_back, days_ahead=21)
 
 # ─── Page config ──────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="FinIntel AI",
-    page_icon="📊",
+    page_icon="",
     layout="wide",
     initial_sidebar_state="expanded",  # always open on load
 )
@@ -282,7 +311,7 @@ with st.sidebar:
     st.markdown("""
     <div style="padding: 8px 0 16px 0">
         <p style="font-size:22px;font-weight:800;color:#FFFFFF;margin:0;letter-spacing:-0.5px">
-            📊 FinIntel AI
+             FinIntel AI
         </p>
         <p style="font-size:12px;color:#8E8E93;margin:4px 0 0 0;font-weight:500">
             Financial Intelligence Platform
@@ -294,14 +323,14 @@ with st.sidebar:
     st.markdown('<p style="color:#8E8E93;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px">Analysis Mode</p>', unsafe_allow_html=True)
     app_mode = st.radio(
         "mode",
-        ["🔍 Search Mode", "📂 Upload Mode"],
+        [" Search Mode", " Upload Mode"],
         label_visibility="collapsed",
         horizontal=True,
     )
     st.markdown("---")
 
     # ── SEARCH MODE sidebar ───────────────────────────────────────────────────
-    if app_mode == "🔍 Search Mode":
+    if app_mode == " Search Mode":
         st.markdown("**Search Company**")
         search_input = st.text_input(
             "Company name or ticker",
@@ -310,7 +339,7 @@ with st.sidebar:
         )
         search_col, _ = st.columns([1, 1])
         with search_col:
-            search_btn = st.button("🔍 Analyze", use_container_width=True)
+            search_btn = st.button(" Analyze", use_container_width=True)
 
         st.markdown("---")
         st.markdown('<p style="color:#8E8E93;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px">Quick Access</p>', unsafe_allow_html=True)
@@ -364,7 +393,7 @@ with st.sidebar:
         </div>
         """, unsafe_allow_html=True)
 
-        upload_btn = st.button("📂 Analyze Financials", use_container_width=True)
+        upload_btn = st.button(" Analyze Financials", use_container_width=True)
 
         # Benchmark peer input
         st.markdown("---")
@@ -436,7 +465,7 @@ with st.sidebar:
         groq_key = _server_key
         st.markdown("""
         <div style="background:#34C75911;border:1px solid #34C75933;border-radius:8px;padding:10px 12px">
-            <p style="color:#34C759;font-size:12px;font-weight:600;margin:0">🤖 AI Analysis Active</p>
+            <p style="color:#34C759;font-size:12px;font-weight:600;margin:0"> AI Analysis Active</p>
             <p style="color:#8E8E93;font-size:11px;margin:4px 0 0">Powered by Groq · Llama 3.3 70B</p>
         </div>
         """, unsafe_allow_html=True)
@@ -449,7 +478,7 @@ with st.sidebar:
             label_visibility="collapsed",
         )
         if groq_key:
-            st.success("✓ AI mode enabled", icon="🤖")
+            st.success(" AI mode enabled", icon="")
         else:
             st.markdown("""
             <div style="background:#FF9F0A11;border:1px solid #FF9F0A33;border-radius:8px;padding:10px 12px">
@@ -468,6 +497,15 @@ with st.sidebar:
         Built by Hetal Shah · github.com/Hshah168
     </p>
     """, unsafe_allow_html=True)
+
+# ─── Load FMP key for IPO tracker ─────────────────────────────────────────────
+def _load_fmp_key() -> str:
+    try:
+        k = st.secrets.get("FMP_API_KEY", "")
+        if k and k != "your_fmp_key_here": return k
+    except Exception: pass
+    import os
+    return os.environ.get("FMP_API_KEY", "")
 
 
 # ─── Search handler ────────────────────────────────────────────────────────────
@@ -489,12 +527,12 @@ if search_btn and search_input.strip():
 # ══════════════════════════════════════════════════════════════════════════════
 # UPLOAD MODE DASHBOARD
 # ══════════════════════════════════════════════════════════════════════════════
-if app_mode == "📂 Upload Mode":
+if app_mode == " Upload Mode":
     if not st.session_state.upload_statements:
         # Upload mode landing
         st.markdown("""
         <div style="text-align:center;padding:60px 20px 30px">
-            <p style="font-size:48px;margin:0">📂</p>
+            <p style="font-size:48px;margin:0"></p>
             <h1 style="font-size:32px;font-weight:800;color:#FFFFFF;margin:12px 0 8px">Upload Mode</h1>
             <p style="font-size:16px;color:#8E8E93;margin:0 0 12px;max-width:500px;display:inline-block">
                 Analyze any company's internal financials. Public or private,<br>
@@ -505,9 +543,9 @@ if app_mode == "📂 Upload Mode":
 
         use_cols = st.columns(3)
         use_cases = [
-            ("🏢", "Public Companies", "Analyze internal divisions, management accounts, or unreported segment data not in public filings."),
-            ("🔒", "Private Companies", "Get the same KPIs, health score, and CFO Brief as any public company — from your own data."),
-            ("📊", "Any Organization", "Startups, nonprofits, subsidiaries, joint ventures. If it has a P&L, this works."),
+            ("", "Public Companies", "Analyze internal divisions, management accounts, or unreported segment data not in public filings."),
+            ("", "Private Companies", "Get the same KPIs, health score, and CFO Brief as any public company — from your own data."),
+            ("", "Any Organization", "Startups, nonprofits, subsidiaries, joint ventures. If it has a P&L, this works."),
         ]
         for col, (icon, title, desc) in zip(use_cols, use_cases):
             with col:
@@ -569,7 +607,7 @@ if app_mode == "📂 Upload Mode":
     st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
     # Tabs for upload mode
-    u_tabs = st.tabs(["📋 Financials", "🎯 KPIs & Health", "💡 Insights", "📄 CFO Brief", "🏆 Peer Compare"])
+    u_tabs = st.tabs([" Financials", " KPIs & Health", " Insights", " CFO Brief", " Peer Compare"])
 
     # ── U-Tab 1: Financials ───────────────────────────────────────────────────
     with u_tabs[0]:
@@ -652,13 +690,13 @@ if app_mode == "📂 Upload Mode":
                 uname, "UPLOAD", u_kpis, u_score, u_label, {},
                 api_key=groq_key or None,
             )
-        icons = {"Revenue Trend":"📈","Profitability Trend":"💰",
-                 "Balance Sheet Strength":"🏦","Cash Flow Analysis":"💸"}
+        icons = {"Revenue Trend":"","Profitability Trend":"",
+                 "Balance Sheet Strength":"","Cash Flow Analysis":""}
         for title, text in u_insights.items():
             st.markdown(f"""
             <div class="insight-card">
                 <p style="color:#0A84FF;font-size:11px;text-transform:uppercase;
-                          letter-spacing:0.8px;font-weight:700;margin:0 0 6px">{icons.get(title,"📊")} {title}</p>
+                          letter-spacing:0.8px;font-weight:700;margin:0 0 6px">{icons.get(title,"")} {title}</p>
                 <p style="color:#FFFFFF;font-size:14px;line-height:1.6;margin:0">{text}</p>
             </div>
             """, unsafe_allow_html=True)
@@ -667,7 +705,7 @@ if app_mode == "📂 Upload Mode":
     with u_tabs[3]:
         st.markdown("**CFO Brief Generator**")
         st.markdown('<p style="color:#8E8E93;font-size:13px">Generate a structured executive brief from your uploaded financials.</p>', unsafe_allow_html=True)
-        if st.button("📄 Generate CFO Brief", key="u_cfo_btn"):
+        if st.button(" Generate CFO Brief", key="u_cfo_btn"):
             with st.spinner("Compiling CFO Brief..."):
                 u_brief = generate_cfo_brief(
                     uname, "UPLOAD", {}, u_kpis, u_score, u_label, [],
@@ -719,15 +757,10 @@ if app_mode == "📂 Upload Mode":
                     fig.add_trace(go.Bar(name=pname, x=labels, y=pvals,
                                          marker_color=COLORS["neutral"],
                                          text=[f"{v:.1f}%" for v in pvals], textposition="outside"))
-                    fig.update_layout(
-                        title="Margin Comparison",
-                        height=350,
-                        barmode="group",
-                        yaxis=dict(ticksuffix="%"),
-                        plot_bgcolor="rgba(0,0,0,0)",
-                        paper_bgcolor="rgba(0,0,0,0)",
-                        font=dict(color="#FFFFFF"),
-                    )
+                    layout = layout_defaults("Margin Comparison", height=350)
+                    layout["barmode"] = "group"
+                    layout["yaxis"]["ticksuffix"] = "%"
+                    fig.update_layout(**layout)
                     st.plotly_chart(fig, use_container_width=True, config=chart_config())
 
                 # Health score cards
@@ -755,11 +788,11 @@ if app_mode == "📂 Upload Mode":
 # ─── Landing page (no company selected) ───────────────────────────────────────
 if not st.session_state.ticker:
     st.markdown("""
-    <div style="text-align:center;padding:80px 20px 40px">
-        <p style="font-size:48px;margin:0">📊</p>
+    <div style="text-align:center;padding:40px 20px 20px">
+        <p style="font-size:48px;margin:0"></p>
         <h1 style="font-size:40px;font-weight:800;color:#FFFFFF;margin:12px 0 8px;
                    letter-spacing:-1px">FinIntel AI</h1>
-        <p style="font-size:18px;color:#8E8E93;margin:0 0 32px;max-width:520px;
+        <p style="font-size:18px;color:#8E8E93;margin:0 0 24px;max-width:520px;
                    display:inline-block">
             Enterprise-grade financial intelligence for analysts,<br>
             FP&A teams, and business leaders.
@@ -770,12 +803,12 @@ if not st.session_state.ticker:
     # Feature cards
     cols = st.columns(3)
     features = [
-        ("🔍", "Smart Search", "Type any company name — Microsoft, TCS, SAP, Reliance. Auto-resolves to ticker."),
-        ("📈", "Deep Analytics", "Income statements, balance sheets, cash flows, KPIs, and financial health scoring."),
-        ("🤖", "AI Insights", "AI Analyst Copilot, CFO Brief generator, and executive insight narratives."),
-        ("🌍", "Global Coverage", "US, Indian, European, and Asian markets. Supports NSE, NYSE, NASDAQ, and more."),
-        ("⚡", "Peer Comparison", "Benchmark against competitors across revenue, margins, ROE, and market cap."),
-        ("📰", "News Center", "Real-time financial news aggregated and ranked for any company."),
+        ("", "Smart Search", "Type any company name — Microsoft, TCS, SAP, Reliance. Auto-resolves to ticker."),
+        ("", "Deep Analytics", "Income statements, balance sheets, cash flows, KPIs, and financial health scoring."),
+        ("", "AI Insights", "AI Analyst Copilot, CFO Brief generator, and executive insight narratives."),
+        ("", "Global Coverage", "US, Indian, European, and Asian markets. Supports NSE, NYSE, NASDAQ, and more."),
+        ("", "Survival Predictor", "Probabilistic 24-month financial survival model for any public or private company."),
+        ("", "Upload Mode", "Analyze private financials and benchmark against public peers. No ticker needed."),
     ]
     for i, (icon, title, desc) in enumerate(features):
         with cols[i % 3]:
@@ -788,13 +821,244 @@ if not st.session_state.ticker:
             </div>
             """, unsafe_allow_html=True)
 
+    # ── IPO TRACKER ───────────────────────────────────────────────────────────
+    st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+
+    ipo_header, ipo_refresh = st.columns([3, 1])
+    with ipo_header:
+        st.markdown("##  IPO Tracker")
+        st.markdown('<p style="color:#8E8E93;font-size:13px;margin:0">Companies, ETFs, and funds that recently went public — with live price performance since listing.</p>', unsafe_allow_html=True)
+    with ipo_refresh:
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button(" Refresh", key="ipo_refresh_btn"):
+            get_ipo_data.clear()
+
+    # Load IPO data
+    finnhub_key = _load_finnhub_key()
+    with st.spinner("Loading IPO data..."):
+        if finnhub_key:
+            ipo_data = get_ipo_data(finnhub_key, days_back=60, days_ahead=21)
+        else:
+            ipo_data = get_ipo_data_no_key(days_back=60)
+
+    if not finnhub_key:
+        st.markdown("""
+        <div style="background:#FF9F0A11;border:1px solid #FF9F0A33;border-radius:8px;
+                    padding:10px 14px;margin-bottom:12px">
+            <p style="color:#FF9F0A;font-size:12px;font-weight:500;margin:0">
+                 Add a free Finnhub API key to secrets.toml as <b>FINNHUB_API_KEY</b>
+                for live IPO calendar data. Get one at
+                <a href="https://finnhub.io" target="_blank" style="color:#FF9F0A">finnhub.io</a>
+                (free, 60 calls/min). Showing curated recent IPOs as fallback.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    ipo_tab1, ipo_tab2 = st.tabs([" Recent IPOs", " Upcoming IPOs"])
+
+    # ── Recent IPOs ───────────────────────────────────────────────────────────
+    with ipo_tab1:
+        recent = ipo_data.get("recent", [])
+        if not recent:
+            st.info("No recent IPO data available. Add a Finnhub API key for live data.")
+        else:
+            # Summary stats row
+            total_ipos = len(recent)
+            gainers = [r for r in recent if r.get("return_pct") and r["return_pct"] > 0]
+            losers  = [r for r in recent if r.get("return_pct") and r["return_pct"] < 0]
+            avg_ret = np.mean([r["return_pct"] for r in recent if r.get("return_pct")]) if gainers or losers else None
+
+            s1, s2, s3, s4 = st.columns(4)
+            s1.metric("Total Recent IPOs", total_ipos)
+            s2.metric("Trading Above IPO Price", len(gainers))
+            s3.metric("Trading Below IPO Price", len(losers))
+            s4.metric("Avg Return Since IPO", f"{avg_ret:+.1f}%" if avg_ret is not None else "N/A")
+
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            # IPO cards
+            for ipo in recent:
+                name        = ipo.get("name", "Unknown")
+                ticker      = ipo.get("ticker", "")
+                date        = ipo.get("date", "")
+                offer       = ipo.get("offer_price")
+                current     = ipo.get("current_price")
+                ret_pct     = ipo.get("return_pct")
+                exchange    = ipo.get("exchange", "")
+
+                ret_color  = COLORS["success"] if ret_pct and ret_pct >= 0 else COLORS["danger"]
+                ret_arrow  = "▲" if ret_pct and ret_pct >= 0 else "▼"
+                ret_str    = f"{ret_arrow} {abs(ret_pct):.1f}% since IPO" if ret_pct is not None else "Price data pending"
+                curr_str   = f"${current:,.2f}" if current else "—"
+                offer_str  = f"${offer:,.2f}" if offer else "—"
+                status_bg  = "#34C75911" if ret_pct and ret_pct >= 0 else "#FF3B3011" if ret_pct and ret_pct < 0 else "#2C2C2E"
+                status_border = "#34C75933" if ret_pct and ret_pct >= 0 else "#FF3B3033" if ret_pct and ret_pct < 0 else "#3C3C3E"
+
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.markdown(f"""
+                    <div style="background:#1C1C1E;border:1px solid #2C2C2E;border-radius:12px;
+                                padding:14px 18px;margin-bottom:8px;display:flex;
+                                align-items:center;gap:16px">
+                        <div style="flex:1">
+                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+                                <span style="color:#FFFFFF;font-size:15px;font-weight:700">{name}</span>
+                                <span style="background:#2C2C2E;border-radius:4px;padding:2px 8px;
+                                             font-size:11px;color:#8E8E93;font-family:monospace">{ticker}</span>
+                                <span style="background:#0A84FF22;border-radius:4px;padding:2px 8px;
+                                             font-size:11px;color:#0A84FF">{exchange}</span>
+                            </div>
+                            <span style="color:#8E8E93;font-size:12px">IPO Date: {date} · Offer Price: {offer_str}</span>
+                        </div>
+                        <div style="text-align:right;min-width:140px">
+                            <p style="color:#FFFFFF;font-size:18px;font-weight:700;margin:0">{curr_str}</p>
+                            <p style="color:{ret_color};font-size:13px;font-weight:600;margin:4px 0 0">{ret_str}</p>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                with col2:
+                    if ticker:
+                        if st.button(f"Analyze {ticker}", key=f"ipo_analyze_{ticker}"):
+                            st.session_state.ticker = ticker
+                            st.session_state.company_name = name
+                            st.session_state.chat_history = []
+                            st.session_state.cfo_brief = None
+                            st.rerun()
+
+        st.markdown(f'<p style="color:#48484A;font-size:11px;margin-top:12px">Last updated: {ipo_data.get("last_updated","")}</p>', unsafe_allow_html=True)
+
+    # ── Upcoming IPOs ─────────────────────────────────────────────────────────
+    with ipo_tab2:
+        upcoming = ipo_data.get("upcoming", [])
+        if not upcoming:
+            st.info("No upcoming IPOs in the next 21 days. Add a Finnhub API key for live calendar data.")
+        else:
+            for ipo in upcoming:
+                name     = ipo.get("name", "Unknown")
+                ticker   = ipo.get("ticker", "—")
+                date     = ipo.get("date", "")
+                offer    = ipo.get("offer_price")
+                exchange = ipo.get("exchange", "")
+                tv       = ipo.get("total_value", 0)
+                tv_str   = f"${tv/1e9:.2f}B" if tv and tv >= 1e9 else f"${tv/1e6:.0f}M" if tv and tv >= 1e6 else "—"
+
+                st.markdown(f"""
+                <div style="background:#1C1C1E;border:1px solid #2C2C2E;border-radius:12px;
+                            padding:14px 18px;margin-bottom:8px">
+                    <div style="display:flex;justify-content:space-between;align-items:center">
+                        <div>
+                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+                                <span style="color:#FFFFFF;font-size:15px;font-weight:700">{name}</span>
+                                <span style="background:#2C2C2E;border-radius:4px;padding:2px 8px;
+                                             font-size:11px;color:#8E8E93;font-family:monospace">{ticker}</span>
+                                <span style="background:#0A84FF22;border-radius:4px;padding:2px 8px;
+                                             font-size:11px;color:#0A84FF">{exchange}</span>
+                            </div>
+                            <span style="color:#8E8E93;font-size:12px">
+                                Expected: {date} · Expected Offer: {f"${offer:,.2f}" if offer else "TBD"} · Deal Size: {tv_str}
+                            </span>
+                        </div>
+                        <span style="background:#FF9F0A22;border:1px solid #FF9F0A44;border-radius:6px;
+                                     padding:4px 12px;color:#FF9F0A;font-size:12px;font-weight:600">
+                            UPCOMING
+                        </span>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
     st.markdown("""
-    <div style="text-align:center;padding:20px 0 40px">
+    <div style="text-align:center;padding:16px 0 8px">
         <p style="color:#48484A;font-size:13px">
             Search a company in the sidebar to begin · Powered by Yahoo Finance & Groq AI
         </p>
     </div>
     """, unsafe_allow_html=True)
+
+    # ── IPO & Listings Tracker ────────────────────────────────────────────────
+    st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+    st.markdown("""
+    <div style="margin-bottom:12px">
+        <p style="font-size:18px;font-weight:700;color:#FFFFFF;margin:0"> IPO & New Listings Tracker</p>
+        <p style="color:#8E8E93;font-size:13px;margin:4px 0 0">
+            Recently listed companies, ETFs and funds · Current price vs IPO price · Performance since listing
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    t_col, f_col, r_col = st.columns([1, 2, 1])
+    with t_col:
+        ipo_period = st.radio("Period", ["Last 7 Days", "Last 30 Days"],
+                               horizontal=True, label_visibility="collapsed",
+                               key="ipo_period_landing")
+    with f_col:
+        type_filter = st.multiselect("Type", ["STOCK", "ETF"],
+                                      default=["STOCK", "ETF"],
+                                      label_visibility="collapsed",
+                                      key="ipo_type_filter")
+    with r_col:
+        if st.button(" Refresh", key="ipo_refresh"):
+            fetch_ipo_performance.clear()
+            st.rerun()
+
+    with st.spinner("Loading listings data..."):
+        ipo_df = fetch_ipo_performance(ipo_period)
+
+    if ipo_df is not None and not ipo_df.empty:
+        if type_filter:
+            ipo_df = ipo_df[ipo_df["type"].isin(type_filter)]
+
+        stats = get_ipo_stats(ipo_df)
+        if stats:
+            s1, s2, s3, s4, s5 = st.columns(5)
+            s1.metric("Total Listed", stats.get("total", 0))
+            s2.metric("Gainers", f"▲ {stats.get('gainers',0)}")
+            s3.metric("Losers", f"▼ {stats.get('losers',0)}")
+            s4.metric("Avg Return Since IPO", f"{stats.get('avg_return',0):+.1f}%")
+            s5.metric("Best Performer", f"{stats.get('best_ticker','N/A')} ({stats.get('best_return',0):+.1f}%)")
+
+        st.markdown('<div style="height:10px"></div>', unsafe_allow_html=True)
+
+        for _, row in ipo_df.iterrows():
+            has_price = row["curr_price"] is not None
+            chg_pct = row["change_pct"]
+            chg_dol = row["change_dol"]
+            if has_price and chg_pct is not None:
+                color = COLORS["success"] if chg_pct >= 0 else COLORS["danger"]
+                arrow = "▲" if chg_pct >= 0 else "▼"
+                price_str = f"${row['curr_price']:.2f}"
+                chg_str = f"{arrow} ${abs(chg_dol):.2f} ({chg_pct:+.1f}%) since IPO"
+            else:
+                color = COLORS["text_muted"]
+                price_str = "Pending"
+                chg_str = "Awaiting first trade data"
+
+            type_color = COLORS["primary"] if row["type"] == "STOCK" else COLORS["chart_purple"]
+            st.markdown(f"""
+            <div style="background:#1C1C1E;border:1px solid #2C2C2E;border-radius:12px;
+                        padding:14px 18px;margin-bottom:8px;display:flex;
+                        align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+                <div style="display:flex;align-items:center;gap:12px">
+                    <span style="background:{type_color}22;border:1px solid {type_color}44;
+                                 color:{type_color};font-size:10px;font-weight:700;
+                                 padding:2px 8px;border-radius:4px">{row['type']}</span>
+                    <div>
+                        <p style="color:#FFFFFF;font-size:14px;font-weight:600;margin:0">{row['name']}</p>
+                        <p style="color:#8E8E93;font-size:12px;margin:2px 0 0">
+                            {row['ticker']} · {row['exchange']} · Listed {row['ipo_date']} · {row['days_listed']}d ago
+                        </p>
+                    </div>
+                </div>
+                <div style="text-align:right">
+                    <p style="color:#FFFFFF;font-size:20px;font-weight:700;margin:0">{price_str}</p>
+                    <p style="color:{color};font-size:12px;font-weight:600;margin:2px 0 0">{chg_str}</p>
+                    <p style="color:#48484A;font-size:11px;margin:2px 0 0">IPO Price: ${row['ipo_price']:.2f}</p>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+    else:
+        st.info("No recent listings found for the selected period.")
+
     st.stop()
 
 
@@ -873,14 +1137,15 @@ st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
 # ─── Navigation tabs ───────────────────────────────────────────────────────────
 tabs = st.tabs([
-    "📈 Price & Charts",
-    "📋 Financials",
-    "🎯 KPIs & Health",
-    "💡 Insights",
-    "📰 News",
-    "🤖 AI Copilot",
-    "🏆 Peer Compare",
-    "🔒 Private Co. Analysis",
+    " Price & Charts",
+    " Financials",
+    " KPIs & Health",
+    " Insights",
+    " News",
+    " AI Copilot",
+    " Peer Compare",
+    " Survival Predictor",
+    " Private Co. Analysis",
 ])
 
 
@@ -1067,13 +1332,13 @@ with tabs[3]:
         )
 
     icons = {
-        "Revenue Trend": "📈",
-        "Profitability Trend": "💰",
-        "Balance Sheet Strength": "🏦",
-        "Cash Flow Analysis": "💸",
+        "Revenue Trend": "",
+        "Profitability Trend": "",
+        "Balance Sheet Strength": "",
+        "Cash Flow Analysis": "",
     }
     for title, text in insights.items():
-        icon = icons.get(title, "📊")
+        icon = icons.get(title, "")
         st.markdown(f"""
         <div class="insight-card">
             <p style="color:#0A84FF;font-size:11px;text-transform:uppercase;
@@ -1092,7 +1357,7 @@ with tabs[3]:
 
     gen_col, _ = st.columns([1, 3])
     with gen_col:
-        if st.button("📄 Generate CFO Brief", use_container_width=True):
+        if st.button(" Generate CFO Brief", use_container_width=True):
             with st.spinner("Compiling CFO Brief..."):
                 news_items = get_company_news(ticker, full_name, limit=8)
                 st.session_state.cfo_brief = generate_cfo_brief(
@@ -1135,7 +1400,7 @@ with tabs[4]:
             unsafe_allow_html=True,
         )
     with refresh_col:
-        if st.button("🔄 Refresh News"):
+        if st.button(" Refresh News"):
             st.session_state.news_refresh += 1
             get_company_news.clear()
 
@@ -1161,7 +1426,7 @@ with tabs[4]:
                     <span style="background:#2C2C2E;border-radius:5px;
                                  padding:2px 8px;font-size:11px;color:#8E8E93;
                                  font-weight:500">{publisher}</span>
-                    <span style="color:#48484A;font-size:12px">📅 {pub_date}</span>
+                    <span style="color:#48484A;font-size:12px"> {pub_date}</span>
                     <a href="{link}" target="_blank" style="color:#0A84FF;
                        font-size:12px;text-decoration:none;margin-left:auto">Read →</a>
                 </div>
@@ -1187,7 +1452,7 @@ with tabs[5]:
             <div style="background:#FF9F0A11;border:1px solid #FF9F0A33;
                          border-radius:10px;padding:12px 16px;margin-bottom:16px">
                 <p style="color:#FF9F0A;font-size:13px;margin:0;font-weight:500">
-                    💡 Add your Groq API key in the sidebar for full AI responses.
+                     Add your Groq API key in the sidebar for full AI responses.
                     Rule-based answers available without a key.
                 </p>
             </div>
@@ -1244,7 +1509,7 @@ with tabs[5]:
                 st.session_state.chat_history.append({"role": "assistant", "content": response})
 
         if st.session_state.chat_history:
-            if st.button("🗑 Clear Chat", key="clear_chat"):
+            if st.button(" Clear Chat", key="clear_chat"):
                 st.session_state.chat_history = []
                 st.rerun()
 
@@ -1254,7 +1519,7 @@ with tabs[5]:
         <div style="background:#1C1C1E;border:1px solid #2C2C2E;border-radius:12px;padding:16px">
             <p style="color:#8E8E93;font-size:11px;text-transform:uppercase;letter-spacing:0.8px;margin:0 0 12px">The AI has access to:</p>
             {''.join([
-                f'<p style="color:#FFFFFF;font-size:13px;margin:0 0 8px">✓ {item}</p>'
+                f'<p style="color:#FFFFFF;font-size:13px;margin:0 0 8px"> {item}</p>'
                 for item in [
                     f"{full_name} financial statements",
                     "11 calculated KPIs",
@@ -1424,24 +1689,200 @@ with tabs[6]:
                 textposition="outside",
                 textfont=dict(color=COLORS["text"], size=12),
             ))
-            fig.update_layout(
-                title=f"{chart_metric} Comparison",
-                height=350,
-                yaxis=dict(ticksuffix=suffix),
-                showlegend=False,
-                plot_bgcolor="rgba(0,0,0,0)",
-                paper_bgcolor="rgba(0,0,0,0)",
-                font=dict(color="#FFFFFF"),
-            )
+            layout = layout_defaults(f"{chart_metric} Comparison", height=350)
+            layout["yaxis"]["ticksuffix"] = suffix
+            layout["showlegend"] = False
+            fig.update_layout(**layout)
             st.plotly_chart(fig, use_container_width=True, config=chart_config())
         else:
             st.info("Chart data not available for selected metric.")
 
 
+
+
 # ══════════════════════════════════════════════════════════════════════════════
-# TAB 8: PRIVATE COMPANY ANALYSIS
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 8: SURVIVAL PREDICTOR
 # ══════════════════════════════════════════════════════════════════════════════
 with tabs[7]:
+    st.markdown("** Startup Financial Survival Predictor — Will This Company Survive 24 Months?**")
+    st.markdown("""
+    <div style="background:#BF5AF211;border:1px solid #BF5AF233;border-radius:10px;
+                padding:12px 16px;margin-bottom:20px">
+        <p style="color:#BF5AF2;font-size:12px;font-weight:600;margin:0 0 4px">Methodology</p>
+        <p style="color:#8E8E93;font-size:12px;margin:0;line-height:1.6">
+            Built on distress pattern recognition from PRA Group debt portfolio analysis — identifying
+            the financial fingerprint of companies 12-18 months before they fail. Combined with a
+            Modified Altman Z-Score recalibrated for high-growth tech companies, cash runway modeling,
+            revenue momentum decay analysis, and leverage risk scoring.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    with st.spinner("Running survival model..."):
+        sv = predict_survival(full_name, ticker, income, balance, cashflow, info)
+
+    # ── Headline verdict ──────────────────────────────────────────────────────
+    label_colors = {
+        "Thriving":   COLORS["success"],
+        "Vulnerable": COLORS["warning"],
+        "Critical":   COLORS["danger"],
+    }
+    lc = label_colors.get(sv.overall_label, COLORS["neutral"])
+
+    st.markdown(f"""
+    <div style="background:{lc}11;border:2px solid {lc}44;border-radius:14px;
+                padding:20px 24px;margin-bottom:24px">
+        <p style="color:{lc};font-size:11px;text-transform:uppercase;
+                  letter-spacing:1px;font-weight:700;margin:0 0 6px">24-Month Survival Verdict</p>
+        <p style="color:#FFFFFF;font-size:20px;font-weight:700;margin:0 0 8px;line-height:1.4">{sv.headline}</p>
+        <span style="background:{lc}33;color:{lc};font-size:13px;font-weight:700;
+                     padding:4px 14px;border-radius:20px">{sv.overall_label}</span>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # ── Scenario probability distribution ─────────────────────────────────────
+    st.markdown("**Scenario Probability Distribution**")
+    p1, p2, p3 = st.columns(3)
+    scenarios = [
+        (" Scenario A", "Thriving", sv.prob_thriving,   COLORS["success"]),
+        (" Scenario B", "Vulnerable", sv.prob_vulnerable, COLORS["warning"]),
+        (" Scenario C", "Critical",  sv.prob_critical,   COLORS["danger"]),
+    ]
+    for col, (label, name, pct, color) in zip([p1, p2, p3], scenarios):
+        with col:
+            st.markdown(f"""
+            <div style="background:#1C1C1E;border:1px solid #2C2C2E;border-radius:12px;
+                        padding:18px;text-align:center">
+                <p style="color:#8E8E93;font-size:11px;margin:0 0 4px;text-transform:uppercase;
+                          letter-spacing:0.5px">{label}</p>
+                <p style="color:{color};font-size:14px;font-weight:600;margin:0 0 8px">{name}</p>
+                <p style="color:{color};font-size:40px;font-weight:800;margin:0">{pct:.0f}%</p>
+                <div style="background:#2C2C2E;border-radius:4px;height:6px;margin-top:10px">
+                    <div style="background:{color};border-radius:4px;height:6px;
+                                width:{min(pct,100):.0f}%"></div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+
+    # ── Sub-model scores ──────────────────────────────────────────────────────
+    m1, m2, m3, m4 = st.columns(4)
+    z_color = (COLORS["success"] if sv.z_score_label == "Safe Zone"
+               else COLORS["warning"] if sv.z_score_label == "Grey Zone"
+               else COLORS["danger"])
+    rm = sv.runway_months
+    rm_color = (COLORS["success"] if rm and rm > 24 else
+                COLORS["warning"] if rm and rm > 12 else
+                COLORS["danger"] if rm else COLORS["neutral"])
+
+    with m1:
+        st.markdown(f"""
+        <div style="background:#1C1C1E;border:1px solid #2C2C2E;border-radius:12px;padding:16px;text-align:center">
+            <p style="color:#8E8E93;font-size:11px;margin:0 0 4px;text-transform:uppercase">Altman Z-Score</p>
+            <p style="color:{z_color};font-size:28px;font-weight:800;margin:0">{sv.z_score:.2f}</p>
+            <p style="color:{z_color};font-size:12px;font-weight:600;margin:4px 0 0">{sv.z_score_label}</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with m2:
+        rm_str = f"{rm:.0f} mo" if rm else "N/A"
+        st.markdown(f"""
+        <div style="background:#1C1C1E;border:1px solid #2C2C2E;border-radius:12px;padding:16px;text-align:center">
+            <p style="color:#8E8E93;font-size:11px;margin:0 0 4px;text-transform:uppercase">Cash Runway</p>
+            <p style="color:{rm_color};font-size:28px;font-weight:800;margin:0">{rm_str}</p>
+            <p style="color:{rm_color};font-size:12px;font-weight:600;margin:4px 0 0">{sv.runway_label}</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    mom_color = (COLORS["success"] if sv.momentum_score >= 65 else
+                 COLORS["warning"] if sv.momentum_score >= 40 else COLORS["danger"])
+    with m3:
+        st.markdown(f"""
+        <div style="background:#1C1C1E;border:1px solid #2C2C2E;border-radius:12px;padding:16px;text-align:center">
+            <p style="color:#8E8E93;font-size:11px;margin:0 0 4px;text-transform:uppercase">Rev Momentum</p>
+            <p style="color:{mom_color};font-size:28px;font-weight:800;margin:0">{sv.momentum_score:.0f}/100</p>
+            <p style="color:{mom_color};font-size:12px;font-weight:600;margin:4px 0 0">{sv.momentum_label}</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    lev_color = (COLORS["success"] if sv.leverage_risk < 30 else
+                 COLORS["warning"] if sv.leverage_risk < 60 else COLORS["danger"])
+    mt_color = (COLORS["success"] if sv.margin_trajectory == "Improving" else
+                COLORS["warning"] if "Stable" in sv.margin_trajectory else COLORS["danger"])
+    with m4:
+        st.markdown(f"""
+        <div style="background:#1C1C1E;border:1px solid #2C2C2E;border-radius:12px;padding:16px;text-align:center">
+            <p style="color:#8E8E93;font-size:11px;margin:0 0 4px;text-transform:uppercase">Margin Trend</p>
+            <p style="color:{mt_color};font-size:20px;font-weight:800;margin:0">{sv.margin_trajectory}</p>
+            <p style="color:#8E8E93;font-size:11px;margin:4px 0 0">Leverage risk: {sv.leverage_risk:.0f}/100</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+
+    # ── Signals ───────────────────────────────────────────────────────────────
+    rf_col, gf_col = st.columns(2)
+    with rf_col:
+        st.markdown("**️ Distress Signals**")
+        if sv.red_flags:
+            for flag in sv.red_flags:
+                st.markdown(f"""
+                <div style="background:#FF3B3011;border:1px solid #FF3B3033;border-radius:8px;
+                            padding:10px 14px;margin-bottom:6px">
+                    <p style="color:#FF3B30;font-size:12px;margin:0;line-height:1.5"> {flag}</p>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.markdown('<div style="background:#34C75911;border:1px solid #34C75933;border-radius:8px;padding:10px 14px"><p style="color:#34C759;font-size:13px;margin:0"> No critical distress signals detected</p></div>', unsafe_allow_html=True)
+
+    with gf_col:
+        st.markdown("** Strength Signals**")
+        if sv.green_flags:
+            for flag in sv.green_flags:
+                st.markdown(f"""
+                <div style="background:#34C75911;border:1px solid #34C75933;border-radius:8px;
+                            padding:10px 14px;margin-bottom:6px">
+                    <p style="color:#34C759;font-size:12px;margin:0;line-height:1.5"> {flag}</p>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.markdown('<div style="background:#FF9F0A11;border:1px solid #FF9F0A33;border-radius:8px;padding:10px 14px"><p style="color:#FF9F0A;font-size:13px;margin:0">No strong positive signals at this time</p></div>', unsafe_allow_html=True)
+
+    st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+
+    # ── Scenario narratives ───────────────────────────────────────────────────
+    st.markdown("**Detailed Scenario Analysis**")
+    for s_label, s_text, s_color in [
+        ("Scenario A — Thriving", sv.scenario_a_text, COLORS["success"]),
+        ("Scenario B — Vulnerable", sv.scenario_b_text, COLORS["warning"]),
+        ("Scenario C — Critical", sv.scenario_c_text, COLORS["danger"]),
+    ]:
+        st.markdown(f"""
+        <div style="background:#1C1C1E;border-left:3px solid {s_color};border-radius:0 10px 10px 0;
+                    padding:14px 18px;margin-bottom:10px">
+            <p style="color:{s_color};font-size:11px;font-weight:700;text-transform:uppercase;
+                      letter-spacing:0.8px;margin:0 0 6px">{s_label}</p>
+            <p style="color:#FFFFFF;font-size:13px;line-height:1.7;margin:0">{s_text}</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("""
+    <div style="background:#2C2C2E22;border-radius:8px;padding:10px 14px;margin-top:8px">
+        <p style="color:#48484A;font-size:11px;margin:0">
+             Quantitative model only. Not investment advice. Does not account for management quality,
+            market conditions, regulatory changes, or strategic pivots.
+            Methodology: Modified Altman Z-Score (recalibrated for tech) · Cash runway modeling ·
+            Revenue momentum decay · Distress pattern recognition from debt portfolio analysis.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 9: PRIVATE COMPANY ANALYSIS
+# ══════════════════════════════════════════════════════════════════════════════
+with tabs[8]:
     st.markdown("**Private Company Financial Analysis**")
     st.markdown(
         '<p style="color:#8E8E93;font-size:13px">Upload your financials to get KPI analysis, '
@@ -1575,13 +2016,13 @@ with tabs[7]:
                     priv_name, "PRIVATE", priv_kpis, priv_score, priv_label, {},
                     api_key=groq_key or None,
                 )
-            icons = {"Revenue Trend": "📈", "Profitability Trend": "💰",
-                     "Balance Sheet Strength": "🏦", "Cash Flow Analysis": "💸"}
+            icons = {"Revenue Trend": "", "Profitability Trend": "",
+                     "Balance Sheet Strength": "", "Cash Flow Analysis": ""}
             for title, text in priv_insights.items():
                 st.markdown(f"""
                 <div class="insight-card">
                     <p style="color:#0A84FF;font-size:11px;text-transform:uppercase;
-                              letter-spacing:0.8px;font-weight:700;margin:0 0 6px">{icons.get(title,"📊")} {title}</p>
+                              letter-spacing:0.8px;font-weight:700;margin:0 0 6px">{icons.get(title,"")} {title}</p>
                     <p style="color:#FFFFFF;font-size:14px;line-height:1.6;margin:0">{text}</p>
                 </div>
                 """, unsafe_allow_html=True)
@@ -1639,15 +2080,10 @@ with tabs[7]:
                         fig.add_trace(go.Bar(name=peer_full_name, x=labels, y=bvals,
                                              marker_color=COLORS["neutral"],
                                              text=[f"{v:.1f}%" for v in bvals], textposition="outside"))
-                        fig.update_layout(
-                            title="Margin Comparison",
-                            height=350,
-                            barmode="group",
-                            yaxis=dict(ticksuffix="%"),
-                            plot_bgcolor="rgba(0,0,0,0)",
-                            paper_bgcolor="rgba(0,0,0,0)",
-                            font=dict(color="#FFFFFF"),
-                        )
+                        layout = layout_defaults("Margin Comparison", height=350)
+                        layout["barmode"] = "group"
+                        layout["yaxis"]["ticksuffix"] = "%"
+                        fig.update_layout(**layout)
                         st.plotly_chart(fig, use_container_width=True, config=chart_config())
 
                     # Health score side by side
