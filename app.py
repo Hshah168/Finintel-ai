@@ -31,7 +31,7 @@ from utils import (
     layout_defaults,
 )
 from private_company import parse_uploaded_file, get_available_statements
-from ipo_tracker import IPO_DATABASE, fetch_ipo_performance, get_ipo_stats
+from ipo_tracker import fetch_ipo_performance, get_ipo_stats
 from survival_predictor import predict_survival
 
 # ─── Load Groq API key ────────────────────────────────────────────────────────
@@ -47,57 +47,6 @@ def _load_groq_key() -> str | None:
     if key and key.startswith("gsk_"):
         return key
     return None
-
-# ─── Load Finnhub API key ─────────────────────────────────────────────────────
-def _load_finnhub_key() -> str | None:
-    import os
-    try:
-        key = st.secrets["FINNHUB_API_KEY"]
-        if key:
-            return key.strip()
-    except Exception:
-        pass
-    key = os.environ.get("FINNHUB_API_KEY", "").strip()
-    return key or None
-
-@st.cache_data(ttl=1800)
-def get_ipo_data(finnhub_key: str | None, days_back: int = 60, days_ahead: int = 21) -> dict:
-    today = datetime.now().date()
-    recent_cutoff = today - pd.Timedelta(days=days_back)
-    upcoming_cutoff = today + pd.Timedelta(days=days_ahead)
-    recent = []
-    upcoming = []
-
-    for ticker, name, ipo_type, ipo_date, ipo_price, exchange in IPO_DATABASE:
-        try:
-            ipo_dt = datetime.strptime(ipo_date, "%Y-%m-%d").date()
-        except Exception:
-            continue
-
-        item = {
-            "ticker": ticker,
-            "name": name,
-            "date": ipo_date,
-            "offer_price": ipo_price,
-            "exchange": exchange,
-            "current_price": None,
-            "return_pct": None,
-            "total_value": None,
-        }
-        if recent_cutoff <= ipo_dt <= today:
-            recent.append(item)
-        elif today < ipo_dt <= upcoming_cutoff:
-            upcoming.append(item)
-
-    return {
-        "recent": recent,
-        "upcoming": upcoming,
-        "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-    }
-
-@st.cache_data(ttl=1800)
-def get_ipo_data_no_key(days_back: int = 60) -> dict:
-    return get_ipo_data(None, days_back=days_back, days_ahead=21)
 
 # ─── Page config ──────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -800,265 +749,171 @@ if not st.session_state.ticker:
     </div>
     """, unsafe_allow_html=True)
 
-    # Feature cards
-    cols = st.columns(3)
-    features = [
-        ("", "Smart Search", "Type any company name — Microsoft, TCS, SAP, Reliance. Auto-resolves to ticker."),
-        ("", "Deep Analytics", "Income statements, balance sheets, cash flows, KPIs, and financial health scoring."),
-        ("", "AI Insights", "AI Analyst Copilot, CFO Brief generator, and executive insight narratives."),
-        ("", "Global Coverage", "US, Indian, European, and Asian markets. Supports NSE, NYSE, NASDAQ, and more."),
-        ("", "Survival Predictor", "Probabilistic 24-month financial survival model for any public or private company."),
-        ("", "Upload Mode", "Analyze private financials and benchmark against public peers. No ticker needed."),
-    ]
-    for i, (icon, title, desc) in enumerate(features):
-        with cols[i % 3]:
+    # ── Hero ──────────────────────────────────────────────────────────────────
+    st.markdown("""
+    <div style="padding:32px 0 24px;border-bottom:1px solid #1C1C1E;margin-bottom:28px">
+        <p style="font-size:12px;color:#0A84FF;font-weight:600;text-transform:uppercase;
+                  letter-spacing:1.5px;margin:0 0 10px">Financial Intelligence Platform</p>
+        <h1 style="font-size:38px;font-weight:800;color:#FFFFFF;margin:0 0 10px;
+                   letter-spacing:-1.5px;line-height:1.15">
+            Institutional-grade analysis.<br>
+            <span style="color:#0A84FF">Zero Bloomberg required.</span>
+        </h1>
+        <p style="font-size:15px;color:#8E8E93;margin:0;max-width:540px;line-height:1.6">
+            Search any public company by name, upload private financials,
+            or track every new IPO — one platform built by an FP&A analyst.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # ── 4-capability strip ────────────────────────────────────────────────────
+    c1, c2, c3, c4 = st.columns(4)
+    for col, (icon, title, sub) in zip(
+        [c1, c2, c3, c4],
+        [("","Smart Search","Type any company name"),
+         ("","Upload Mode","Analyze private financials"),
+         ("","Survival Model","24-month distress prediction"),
+         ("","IPO Tracker","Live listings & performance")],
+    ):
+        with col:
             st.markdown(f"""
-            <div style="background:#1C1C1E;border:1px solid #2C2C2E;border-radius:14px;
-                        padding:20px;margin-bottom:16px;min-height:130px">
-                <p style="font-size:28px;margin:0 0 8px">{icon}</p>
-                <p style="font-size:14px;font-weight:700;color:#FFFFFF;margin:0 0 6px">{title}</p>
-                <p style="font-size:12px;color:#8E8E93;margin:0;line-height:1.5">{desc}</p>
+            <div style="background:#1C1C1E;border:1px solid #2C2C2E;border-radius:10px;padding:14px 16px">
+                <span style="font-size:20px">{icon}</span>
+                <p style="color:#FFFFFF;font-size:13px;font-weight:600;margin:8px 0 2px">{title}</p>
+                <p style="color:#8E8E93;font-size:11px;margin:0">{sub}</p>
             </div>
             """, unsafe_allow_html=True)
 
-    # ── IPO TRACKER ───────────────────────────────────────────────────────────
-    st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+    st.markdown('<div style="height:28px"></div>', unsafe_allow_html=True)
 
-    ipo_header, ipo_refresh = st.columns([3, 1])
-    with ipo_header:
-        st.markdown("##  IPO Tracker")
-        st.markdown('<p style="color:#8E8E93;font-size:13px;margin:0">Companies, ETFs, and funds that recently went public — with live price performance since listing.</p>', unsafe_allow_html=True)
-    with ipo_refresh:
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button(" Refresh", key="ipo_refresh_btn"):
-            get_ipo_data.clear()
-
-    # Load IPO data
-    finnhub_key = _load_finnhub_key()
-    with st.spinner("Loading IPO data..."):
-        if finnhub_key:
-            ipo_data = get_ipo_data(finnhub_key, days_back=60, days_ahead=21)
-        else:
-            ipo_data = get_ipo_data_no_key(days_back=60)
-
-    if not finnhub_key:
+    # ── IPO Tracker header ────────────────────────────────────────────────────
+    hdr, ctrl = st.columns([3, 3])
+    with hdr:
         st.markdown("""
-        <div style="background:#FF9F0A11;border:1px solid #FF9F0A33;border-radius:8px;
-                    padding:10px 14px;margin-bottom:12px">
-            <p style="color:#FF9F0A;font-size:12px;font-weight:500;margin:0">
-                 Add a free Finnhub API key to secrets.toml as <b>FINNHUB_API_KEY</b>
-                for live IPO calendar data. Get one at
-                <a href="https://finnhub.io" target="_blank" style="color:#FF9F0A">finnhub.io</a>
-                (free, 60 calls/min). Showing curated recent IPOs as fallback.
-            </p>
-        </div>
+        <p style="font-size:17px;font-weight:700;color:#FFFFFF;margin:0 0 2px"> IPO & New Listings Tracker</p>
+        <p style="color:#8E8E93;font-size:12px;margin:0">Live price vs IPO price · Performance since listing</p>
         """, unsafe_allow_html=True)
+    with ctrl:
+        ca, cb, cc = st.columns([2, 2, 1])
+        with ca:
+            ipo_period = st.radio("p", ["7 Days", "30 Days", "All Time"],
+                                   horizontal=True, label_visibility="collapsed",
+                                   key="ipo_period_v2")
+        with cb:
+            type_filter = st.multiselect("t", ["STOCK", "ETF"],
+                                          default=["STOCK", "ETF"],
+                                          label_visibility="collapsed",
+                                          key="ipo_type_v2")
+        with cc:
+            if st.button("↺", key="ipo_ref_v2", help="Refresh data"):
+                fetch_ipo_performance.clear()
+                st.rerun()
 
-    ipo_tab1, ipo_tab2 = st.tabs([" Recent IPOs", " Upcoming IPOs"])
+    st.markdown('<div style="height:10px"></div>', unsafe_allow_html=True)
 
-    # ── Recent IPOs ───────────────────────────────────────────────────────────
-    with ipo_tab1:
-        recent = ipo_data.get("recent", [])
-        if not recent:
-            st.info("No recent IPO data available. Add a Finnhub API key for live data.")
-        else:
-            # Summary stats row
-            total_ipos = len(recent)
-            gainers = [r for r in recent if r.get("return_pct") and r["return_pct"] > 0]
-            losers  = [r for r in recent if r.get("return_pct") and r["return_pct"] < 0]
-            avg_ret = np.mean([r["return_pct"] for r in recent if r.get("return_pct")]) if gainers or losers else None
+    # Load data based on period
+    import datetime as _dt
+    from ipo_tracker import IPO_DATABASE
 
-            s1, s2, s3, s4 = st.columns(4)
-            s1.metric("Total Recent IPOs", total_ipos)
-            s2.metric("Trading Above IPO Price", len(gainers))
-            s3.metric("Trading Below IPO Price", len(losers))
-            s4.metric("Avg Return Since IPO", f"{avg_ret:+.1f}%" if avg_ret is not None else "N/A")
+    if ipo_period == "All Time":
+        all_rows = []
+        for r in sorted(IPO_DATABASE, key=lambda x: x[3], reverse=True):
+            row_d = {
+                "ticker": r[0], "name": r[1], "type": r[2],
+                "ipo_date": r[3], "ipo_price": r[4], "exchange": r[5],
+                "curr_price": None, "change_pct": None, "change_dol": None,
+                "days_listed": (_dt.datetime.now() - _dt.datetime.strptime(r[3],"%Y-%m-%d")).days,
+            }
+            try:
+                ci = yf.Ticker(r[0]).info
+                cp = ci.get("currentPrice") or ci.get("regularMarketPrice") or ci.get("previousClose")
+                if cp:
+                    cp = float(cp)
+                    row_d.update({"curr_price": cp, "change_dol": cp - r[4],
+                                  "change_pct": (cp - r[4]) / r[4] * 100})
+            except Exception:
+                pass
+            all_rows.append(row_d)
+        ipo_df = pd.DataFrame(all_rows)
+    else:
+        period_arg = "Last 7 Days" if ipo_period == "7 Days" else "Last 30 Days"
+        with st.spinner(""):
+            ipo_df = fetch_ipo_performance(period_arg)
 
-            st.markdown("<br>", unsafe_allow_html=True)
+    if type_filter and ipo_df is not None and not ipo_df.empty:
+        ipo_df = ipo_df[ipo_df["type"].isin(type_filter)]
 
-            # IPO cards
-            for ipo in recent:
-                name        = ipo.get("name", "Unknown")
-                ticker      = ipo.get("ticker", "")
-                date        = ipo.get("date", "")
-                offer       = ipo.get("offer_price")
-                current     = ipo.get("current_price")
-                ret_pct     = ipo.get("return_pct")
-                exchange    = ipo.get("exchange", "")
+    if ipo_df is not None and not ipo_df.empty:
+        stats = get_ipo_stats(ipo_df)
+        if stats:
+            sc1, sc2, sc3, sc4, sc5 = st.columns(5)
+            for col, (lbl, val) in zip(
+                [sc1, sc2, sc3, sc4, sc5],
+                [("Listed",        str(stats.get("total",0))),
+                 ("Gainers ▲",     str(stats.get("gainers",0))),
+                 ("Losers ▼",      str(stats.get("losers",0))),
+                 ("Avg Return",    f"{stats.get('avg_return',0):+.1f}%"),
+                 ("Best",          f"{stats.get('best_ticker','—')} {stats.get('best_return',0):+.0f}%")],
+            ):
+                col.metric(lbl, val)
 
-                ret_color  = COLORS["success"] if ret_pct and ret_pct >= 0 else COLORS["danger"]
-                ret_arrow  = "▲" if ret_pct and ret_pct >= 0 else "▼"
-                ret_str    = f"{ret_arrow} {abs(ret_pct):.1f}% since IPO" if ret_pct is not None else "Price data pending"
-                curr_str   = f"${current:,.2f}" if current else "—"
-                offer_str  = f"${offer:,.2f}" if offer else "—"
-                status_bg  = "#34C75911" if ret_pct and ret_pct >= 0 else "#FF3B3011" if ret_pct and ret_pct < 0 else "#2C2C2E"
-                status_border = "#34C75933" if ret_pct and ret_pct >= 0 else "#FF3B3033" if ret_pct and ret_pct < 0 else "#3C3C3E"
+        st.markdown('<div style="height:8px"></div>', unsafe_allow_html=True)
 
-                col1, col2 = st.columns([3, 1])
-                with col1:
-                    st.markdown(f"""
-                    <div style="background:#1C1C1E;border:1px solid #2C2C2E;border-radius:12px;
-                                padding:14px 18px;margin-bottom:8px;display:flex;
-                                align-items:center;gap:16px">
-                        <div style="flex:1">
-                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-                                <span style="color:#FFFFFF;font-size:15px;font-weight:700">{name}</span>
-                                <span style="background:#2C2C2E;border-radius:4px;padding:2px 8px;
-                                             font-size:11px;color:#8E8E93;font-family:monospace">{ticker}</span>
-                                <span style="background:#0A84FF22;border-radius:4px;padding:2px 8px;
-                                             font-size:11px;color:#0A84FF">{exchange}</span>
-                            </div>
-                            <span style="color:#8E8E93;font-size:12px">IPO Date: {date} · Offer Price: {offer_str}</span>
-                        </div>
-                        <div style="text-align:right;min-width:140px">
-                            <p style="color:#FFFFFF;font-size:18px;font-weight:700;margin:0">{curr_str}</p>
-                            <p style="color:{ret_color};font-size:13px;font-weight:600;margin:4px 0 0">{ret_str}</p>
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
+        for _, row in ipo_df.iterrows():
+            chg_pct = row.get("change_pct")
+            chg_dol = row.get("change_dol")
+            curr    = row.get("curr_price")
+            if curr is not None and chg_pct is not None:
+                clr   = COLORS["success"] if chg_pct >= 0 else COLORS["danger"]
+                arrow = "▲" if chg_pct >= 0 else "▼"
+                p_str = f"<span style=\"color:#FFFFFF;font-size:16px;font-weight:700\">${curr:.2f}</span>"
+                c_str = f"<span style=\"color:{clr};font-size:11px;font-weight:600\">{arrow} ${abs(chg_dol):.2f} ({chg_pct:+.1f}% since IPO)</span>"
+                i_str = f"<span style=\"color:#48484A;font-size:10px\">IPO ${row['ipo_price']:.2f}</span>"
+            else:
+                clr   = COLORS["text_muted"]
+                p_str = "<span style=\"color:#48484A;font-size:13px\">Price pending</span>"
+                c_str = f"<span style=\"color:#48484A;font-size:10px\">IPO ${row['ipo_price']:.2f}</span>"
+                i_str = ""
 
-                with col2:
-                    if ticker:
-                        if st.button(f"Analyze {ticker}", key=f"ipo_analyze_{ticker}"):
-                            st.session_state.ticker = ticker
-                            st.session_state.company_name = name
-                            st.session_state.chat_history = []
-                            st.session_state.cfo_brief = None
-                            st.rerun()
-
-        st.markdown(f'<p style="color:#48484A;font-size:11px;margin-top:12px">Last updated: {ipo_data.get("last_updated","")}</p>', unsafe_allow_html=True)
-
-    # ── Upcoming IPOs ─────────────────────────────────────────────────────────
-    with ipo_tab2:
-        upcoming = ipo_data.get("upcoming", [])
-        if not upcoming:
-            st.info("No upcoming IPOs in the next 21 days. Add a Finnhub API key for live calendar data.")
-        else:
-            for ipo in upcoming:
-                name     = ipo.get("name", "Unknown")
-                ticker   = ipo.get("ticker", "—")
-                date     = ipo.get("date", "")
-                offer    = ipo.get("offer_price")
-                exchange = ipo.get("exchange", "")
-                tv       = ipo.get("total_value", 0)
-                tv_str   = f"${tv/1e9:.2f}B" if tv and tv >= 1e9 else f"${tv/1e6:.0f}M" if tv and tv >= 1e6 else "—"
-
+            tc = COLORS["primary"] if row["type"] == "STOCK" else COLORS["chart_purple"]
+            lc, rc = st.columns([5, 1])
+            with lc:
                 st.markdown(f"""
-                <div style="background:#1C1C1E;border:1px solid #2C2C2E;border-radius:12px;
-                            padding:14px 18px;margin-bottom:8px">
-                    <div style="display:flex;justify-content:space-between;align-items:center">
+                <div style="background:#1C1C1E;border:1px solid #2C2C2E;border-radius:10px;
+                            padding:11px 16px;display:flex;align-items:center;
+                            justify-content:space-between;margin-bottom:5px">
+                    <div style="display:flex;align-items:center;gap:10px">
+                        <span style="background:{tc}22;border:1px solid {tc}44;color:{tc};
+                                     font-size:9px;font-weight:700;padding:2px 6px;
+                                     border-radius:4px">{row["type"]}</span>
                         <div>
-                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-                                <span style="color:#FFFFFF;font-size:15px;font-weight:700">{name}</span>
-                                <span style="background:#2C2C2E;border-radius:4px;padding:2px 8px;
-                                             font-size:11px;color:#8E8E93;font-family:monospace">{ticker}</span>
-                                <span style="background:#0A84FF22;border-radius:4px;padding:2px 8px;
-                                             font-size:11px;color:#0A84FF">{exchange}</span>
-                            </div>
-                            <span style="color:#8E8E93;font-size:12px">
-                                Expected: {date} · Expected Offer: {f"${offer:,.2f}" if offer else "TBD"} · Deal Size: {tv_str}
+                            <span style="color:#FFFFFF;font-size:13px;font-weight:600">{row["name"]}</span>
+                            <span style="color:#48484A;font-size:11px;margin-left:8px">
+                                {row["ticker"]} · {row["exchange"]} · {row["ipo_date"]} · {row["days_listed"]}d
                             </span>
                         </div>
-                        <span style="background:#FF9F0A22;border:1px solid #FF9F0A44;border-radius:6px;
-                                     padding:4px 12px;color:#FF9F0A;font-size:12px;font-weight:600">
-                            UPCOMING
-                        </span>
+                    </div>
+                    <div style="text-align:right;white-space:nowrap">
+                        {p_str}<br>{c_str}<br>{i_str}
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
-
-    st.markdown("""
-    <div style="text-align:center;padding:16px 0 8px">
-        <p style="color:#48484A;font-size:13px">
-            Search a company in the sidebar to begin · Powered by Yahoo Finance & Groq AI
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # ── IPO & Listings Tracker ────────────────────────────────────────────────
-    st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-    st.markdown("""
-    <div style="margin-bottom:12px">
-        <p style="font-size:18px;font-weight:700;color:#FFFFFF;margin:0"> IPO & New Listings Tracker</p>
-        <p style="color:#8E8E93;font-size:13px;margin:4px 0 0">
-            Recently listed companies, ETFs and funds · Current price vs IPO price · Performance since listing
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    t_col, f_col, r_col = st.columns([1, 2, 1])
-    with t_col:
-        ipo_period = st.radio("Period", ["Last 7 Days", "Last 30 Days"],
-                               horizontal=True, label_visibility="collapsed",
-                               key="ipo_period_landing")
-    with f_col:
-        type_filter = st.multiselect("Type", ["STOCK", "ETF"],
-                                      default=["STOCK", "ETF"],
-                                      label_visibility="collapsed",
-                                      key="ipo_type_filter")
-    with r_col:
-        if st.button(" Refresh", key="ipo_refresh"):
-            fetch_ipo_performance.clear()
-            st.rerun()
-
-    with st.spinner("Loading listings data..."):
-        ipo_df = fetch_ipo_performance(ipo_period)
-
-    if ipo_df is not None and not ipo_df.empty:
-        if type_filter:
-            ipo_df = ipo_df[ipo_df["type"].isin(type_filter)]
-
-        stats = get_ipo_stats(ipo_df)
-        if stats:
-            s1, s2, s3, s4, s5 = st.columns(5)
-            s1.metric("Total Listed", stats.get("total", 0))
-            s2.metric("Gainers", f"▲ {stats.get('gainers',0)}")
-            s3.metric("Losers", f"▼ {stats.get('losers',0)}")
-            s4.metric("Avg Return Since IPO", f"{stats.get('avg_return',0):+.1f}%")
-            s5.metric("Best Performer", f"{stats.get('best_ticker','N/A')} ({stats.get('best_return',0):+.1f}%)")
-
-        st.markdown('<div style="height:10px"></div>', unsafe_allow_html=True)
-
-        for _, row in ipo_df.iterrows():
-            has_price = row["curr_price"] is not None
-            chg_pct = row["change_pct"]
-            chg_dol = row["change_dol"]
-            if has_price and chg_pct is not None:
-                color = COLORS["success"] if chg_pct >= 0 else COLORS["danger"]
-                arrow = "▲" if chg_pct >= 0 else "▼"
-                price_str = f"${row['curr_price']:.2f}"
-                chg_str = f"{arrow} ${abs(chg_dol):.2f} ({chg_pct:+.1f}%) since IPO"
-            else:
-                color = COLORS["text_muted"]
-                price_str = "Pending"
-                chg_str = "Awaiting first trade data"
-
-            type_color = COLORS["primary"] if row["type"] == "STOCK" else COLORS["chart_purple"]
-            st.markdown(f"""
-            <div style="background:#1C1C1E;border:1px solid #2C2C2E;border-radius:12px;
-                        padding:14px 18px;margin-bottom:8px;display:flex;
-                        align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-                <div style="display:flex;align-items:center;gap:12px">
-                    <span style="background:{type_color}22;border:1px solid {type_color}44;
-                                 color:{type_color};font-size:10px;font-weight:700;
-                                 padding:2px 8px;border-radius:4px">{row['type']}</span>
-                    <div>
-                        <p style="color:#FFFFFF;font-size:14px;font-weight:600;margin:0">{row['name']}</p>
-                        <p style="color:#8E8E93;font-size:12px;margin:2px 0 0">
-                            {row['ticker']} · {row['exchange']} · Listed {row['ipo_date']} · {row['days_listed']}d ago
-                        </p>
-                    </div>
-                </div>
-                <div style="text-align:right">
-                    <p style="color:#FFFFFF;font-size:20px;font-weight:700;margin:0">{price_str}</p>
-                    <p style="color:{color};font-size:12px;font-weight:600;margin:2px 0 0">{chg_str}</p>
-                    <p style="color:#48484A;font-size:11px;margin:2px 0 0">IPO Price: ${row['ipo_price']:.2f}</p>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+            with rc:
+                if st.button("Analyze →", key=f"ipo_btn_{row['ticker']}",
+                              use_container_width=True):
+                    st.session_state.ticker = row["ticker"]
+                    st.session_state.company_name = row["name"]
+                    st.session_state.chat_history = []
+                    st.session_state.cfo_brief = None
+                    st.rerun()
     else:
-        st.info("No recent listings found for the selected period.")
+        st.info("No listings found. Try \'All Time\' to see the full database.")
 
+    st.markdown("""
+    <p style="color:#48484A;font-size:11px;margin-top:14px;text-align:center">
+        Yahoo Finance · Refreshes every 30 min · Not financial advice · Built by Hetal Shah
+    </p>
+    """, unsafe_allow_html=True)
     st.stop()
 
 
