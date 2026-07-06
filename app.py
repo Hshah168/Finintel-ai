@@ -31,8 +31,10 @@ from utils import (
     layout_defaults,
 )
 from private_company import parse_uploaded_file, get_available_statements
-from ipo_tracker import fetch_ipo_performance, get_ipo_stats
 from survival_predictor import predict_survival
+from export_engine import generate_pdf, generate_pptx
+from variance_analysis import build_variance_table, format_variance_df
+from segment_analysis import build_segment_revenue_estimates, get_segment_description
 
 # ─── Load Groq API key ────────────────────────────────────────────────────────
 def _load_groq_key() -> str | None:
@@ -51,9 +53,9 @@ def _load_groq_key() -> str | None:
 # ─── Page config ──────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="FinIntel AI",
-    page_icon="",
+    page_icon="📊",
     layout="wide",
-    initial_sidebar_state="expanded",  # always open on load
+    initial_sidebar_state="expanded",
 )
 
 # ─── Global CSS ───────────────────────────────────────────────────────────────
@@ -253,6 +255,8 @@ if "upload_company_name" not in st.session_state:
     st.session_state.upload_company_name = None
 if "upload_peer" not in st.session_state:
     st.session_state.upload_peer = ""
+if "recent_companies" not in st.session_state:
+    st.session_state.recent_companies = []  # list of (ticker, name) tuples
 
 
 # ─── Sidebar ──────────────────────────────────────────────────────────────────
@@ -260,7 +264,7 @@ with st.sidebar:
     st.markdown("""
     <div style="padding: 8px 0 16px 0">
         <p style="font-size:22px;font-weight:800;color:#FFFFFF;margin:0;letter-spacing:-0.5px">
-             FinIntel AI
+            FinIntel AI
         </p>
         <p style="font-size:12px;color:#8E8E93;margin:4px 0 0 0;font-weight:500">
             Financial Intelligence Platform
@@ -272,14 +276,14 @@ with st.sidebar:
     st.markdown('<p style="color:#8E8E93;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px">Analysis Mode</p>', unsafe_allow_html=True)
     app_mode = st.radio(
         "mode",
-        [" Search Mode", " Upload Mode"],
+        ["Search Mode", "Upload Mode"],
         label_visibility="collapsed",
         horizontal=True,
     )
     st.markdown("---")
 
     # ── SEARCH MODE sidebar ───────────────────────────────────────────────────
-    if app_mode == " Search Mode":
+    if app_mode == "Search Mode":
         st.markdown("**Search Company**")
         search_input = st.text_input(
             "Company name or ticker",
@@ -288,7 +292,7 @@ with st.sidebar:
         )
         search_col, _ = st.columns([1, 1])
         with search_col:
-            search_btn = st.button(" Analyze", use_container_width=True)
+            search_btn = st.button("Analyze", use_container_width=True)
 
         st.markdown("---")
         st.markdown('<p style="color:#8E8E93;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px">Quick Access</p>', unsafe_allow_html=True)
@@ -308,6 +312,19 @@ with st.sidebar:
                     st.session_state.cfo_brief = None
                     st.session_state.upload_statements = None
                     st.session_state.upload_company_name = None
+
+        # ── Recently Analyzed ─────────────────────────────────────────────────
+        if st.session_state.recent_companies:
+            st.markdown("---")
+            st.markdown('<p style="color:#8E8E93;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px">Recently Analyzed</p>', unsafe_allow_html=True)
+            for r_ticker, r_name in st.session_state.recent_companies[:5]:
+                if st.button(f"↩ {r_name}", key=f"recent_{r_ticker}",
+                              use_container_width=True):
+                    st.session_state.ticker = r_ticker
+                    st.session_state.company_name = r_name
+                    st.session_state.chat_history = []
+                    st.session_state.cfo_brief = None
+                    st.rerun()
 
     # ── UPLOAD MODE sidebar ───────────────────────────────────────────────────
     else:
@@ -342,7 +359,7 @@ with st.sidebar:
         </div>
         """, unsafe_allow_html=True)
 
-        upload_btn = st.button(" Analyze Financials", use_container_width=True)
+        upload_btn = st.button("Analyze Financials", use_container_width=True)
 
         # Benchmark peer input
         st.markdown("---")
@@ -383,7 +400,7 @@ with st.sidebar:
                 df.to_excel(writer, sheet_name=sn, index=False)
         buf.seek(0)
         st.download_button(
-            "⬇ Download Excel Template",
+            "Download Excel Template",
             data=buf.getvalue(),
             file_name="FinIntel_Template.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -414,7 +431,7 @@ with st.sidebar:
         groq_key = _server_key
         st.markdown("""
         <div style="background:#34C75911;border:1px solid #34C75933;border-radius:8px;padding:10px 12px">
-            <p style="color:#34C759;font-size:12px;font-weight:600;margin:0"> AI Analysis Active</p>
+            <p style="color:#34C759;font-size:12px;font-weight:600;margin:0">AI Analysis Active</p>
             <p style="color:#8E8E93;font-size:11px;margin:4px 0 0">Powered by Groq · Llama 3.3 70B</p>
         </div>
         """, unsafe_allow_html=True)
@@ -427,7 +444,7 @@ with st.sidebar:
             label_visibility="collapsed",
         )
         if groq_key:
-            st.success(" AI mode enabled", icon="")
+            st.success("AI mode enabled")
         else:
             st.markdown("""
             <div style="background:#FF9F0A11;border:1px solid #FF9F0A33;border-radius:8px;padding:10px 12px">
@@ -476,12 +493,12 @@ if search_btn and search_input.strip():
 # ══════════════════════════════════════════════════════════════════════════════
 # UPLOAD MODE DASHBOARD
 # ══════════════════════════════════════════════════════════════════════════════
-if app_mode == " Upload Mode":
+if app_mode == "Upload Mode":
     if not st.session_state.upload_statements:
         # Upload mode landing
         st.markdown("""
         <div style="text-align:center;padding:60px 20px 30px">
-            <p style="font-size:48px;margin:0"></p>
+            
             <h1 style="font-size:32px;font-weight:800;color:#FFFFFF;margin:12px 0 8px">Upload Mode</h1>
             <p style="font-size:16px;color:#8E8E93;margin:0 0 12px;max-width:500px;display:inline-block">
                 Analyze any company's internal financials. Public or private,<br>
@@ -492,9 +509,9 @@ if app_mode == " Upload Mode":
 
         use_cols = st.columns(3)
         use_cases = [
-            ("", "Public Companies", "Analyze internal divisions, management accounts, or unreported segment data not in public filings."),
-            ("", "Private Companies", "Get the same KPIs, health score, and CFO Brief as any public company — from your own data."),
-            ("", "Any Organization", "Startups, nonprofits, subsidiaries, joint ventures. If it has a P&L, this works."),
+            ("Public Companies", "Analyze internal divisions, management accounts, or unreported segment data not in public filings."),
+            ("Private Companies", "Get the same KPIs, health score, and CFO Brief as any public company — from your own data."),
+            ("Any Organization", "Startups, nonprofits, subsidiaries, joint ventures. If it has a P&L, this works."),
         ]
         for col, (icon, title, desc) in zip(use_cols, use_cases):
             with col:
@@ -556,7 +573,7 @@ if app_mode == " Upload Mode":
     st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
     # Tabs for upload mode
-    u_tabs = st.tabs([" Financials", " KPIs & Health", " Insights", " CFO Brief", " Peer Compare"])
+    u_tabs = st.tabs(["Financials", "KPIs & Health", "Insights", "CFO Brief", "Peer Compare"])
 
     # ── U-Tab 1: Financials ───────────────────────────────────────────────────
     with u_tabs[0]:
@@ -582,7 +599,7 @@ if app_mode == " Upload Mode":
                     st.dataframe(display_df, use_container_width=True)
                     csv_buf = io.StringIO()
                     df.to_csv(csv_buf)
-                    st.download_button(f"⬇ Download {label} CSV", csv_buf.getvalue(),
+                    st.download_button(f"Download {label} CSV", csv_buf.getvalue(),
                                        f"{uname}_{label}.csv", "text/csv", key=f"u_dl_{label}")
 
     # ── U-Tab 2: KPIs & Health ────────────────────────────────────────────────
@@ -639,13 +656,12 @@ if app_mode == " Upload Mode":
                 uname, "UPLOAD", u_kpis, u_score, u_label, {},
                 api_key=groq_key or None,
             )
-        icons = {"Revenue Trend":"","Profitability Trend":"",
-                 "Balance Sheet Strength":"","Cash Flow Analysis":""}
+        icons = {"Revenue Trend":"","Profitability Trend":"","Balance Sheet Strength":"","Cash Flow Analysis":""}
         for title, text in u_insights.items():
             st.markdown(f"""
             <div class="insight-card">
                 <p style="color:#0A84FF;font-size:11px;text-transform:uppercase;
-                          letter-spacing:0.8px;font-weight:700;margin:0 0 6px">{icons.get(title,"")} {title}</p>
+                          letter-spacing:0.8px;font-weight:700;margin:0 0 6px">{title}</p>
                 <p style="color:#FFFFFF;font-size:14px;line-height:1.6;margin:0">{text}</p>
             </div>
             """, unsafe_allow_html=True)
@@ -654,14 +670,14 @@ if app_mode == " Upload Mode":
     with u_tabs[3]:
         st.markdown("**CFO Brief Generator**")
         st.markdown('<p style="color:#8E8E93;font-size:13px">Generate a structured executive brief from your uploaded financials.</p>', unsafe_allow_html=True)
-        if st.button(" Generate CFO Brief", key="u_cfo_btn"):
+        if st.button("Generate CFO Brief", key="u_cfo_btn"):
             with st.spinner("Compiling CFO Brief..."):
                 u_brief = generate_cfo_brief(
                     uname, "UPLOAD", {}, u_kpis, u_score, u_label, [],
                     api_key=groq_key or None,
                 )
             st.markdown(f'<div style="background:#1C1C1E;border:1px solid #2C2C2E;border-radius:12px;padding:24px">{u_brief}</div>', unsafe_allow_html=True)
-            st.download_button("⬇ Download CFO Brief", u_brief,
+            st.download_button("Download CFO Brief", u_brief,
                                f"{uname}_CFO_Brief_{datetime.now().strftime('%Y%m%d')}.md",
                                "text/markdown", key="u_dl_brief")
 
@@ -736,182 +752,106 @@ if app_mode == " Upload Mode":
 
 # ─── Landing page (no company selected) ───────────────────────────────────────
 if not st.session_state.ticker:
+    # ── Hero ──────────────────────────────────────────────────────────────────
     st.markdown("""
-    <div style="text-align:center;padding:40px 20px 20px">
-        <p style="font-size:48px;margin:0"></p>
-        <h1 style="font-size:40px;font-weight:800;color:#FFFFFF;margin:12px 0 8px;
+    <div style="text-align:center;padding:60px 20px 32px">
+        <h1 style="font-size:48px;font-weight:800;color:#FFFFFF;margin:0 0 16px;
                    letter-spacing:-1px">FinIntel AI</h1>
-        <p style="font-size:18px;color:#8E8E93;margin:0 0 24px;max-width:520px;
-                   display:inline-block">
+        <p style="font-size:18px;color:#8E8E93;margin:0 0 0;max-width:520px;
+                   display:inline-block;line-height:1.6">
             Enterprise-grade financial intelligence for analysts,<br>
             FP&A teams, and business leaders.
         </p>
     </div>
     """, unsafe_allow_html=True)
 
-    # ── Hero ──────────────────────────────────────────────────────────────────
-    st.markdown("""
-    <div style="padding:32px 0 24px;border-bottom:1px solid #1C1C1E;margin-bottom:28px">
-        <p style="font-size:12px;color:#0A84FF;font-weight:600;text-transform:uppercase;
-                  letter-spacing:1.5px;margin:0 0 10px">Financial Intelligence Platform</p>
-        <h1 style="font-size:38px;font-weight:800;color:#FFFFFF;margin:0 0 10px;
-                   letter-spacing:-1.5px;line-height:1.15">
-            Institutional-grade analysis.<br>
-            <span style="color:#0A84FF">Zero Bloomberg required.</span>
-        </h1>
-        <p style="font-size:15px;color:#8E8E93;margin:0;max-width:540px;line-height:1.6">
-            Search any public company by name, upload private financials,
-            or track every new IPO — one platform built by an FP&A analyst.
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # ── 4-capability strip ────────────────────────────────────────────────────
-    c1, c2, c3, c4 = st.columns(4)
+    # ── Capability strip ──────────────────────────────────────────────────────
     for col, (icon, title, sub) in zip(
-        [c1, c2, c3, c4],
-        [("","Smart Search","Type any company name"),
-         ("","Upload Mode","Analyze private financials"),
-         ("","Survival Model","24-month distress prediction"),
-         ("","IPO Tracker","Live listings & performance")],
+        st.columns(4),
+        [("", "Smart Search",     "Type any company name, no ticker needed"),
+         ("", "Variance Analysis", "Automated YoY variance with plain-English narrative"),
+         ("", "Upload Mode",       "Analyze internal financials not in public filings"),
+         ("", "Survival Predictor","24-month distress model from PRA Group methodology")],
     ):
         with col:
             st.markdown(f"""
-            <div style="background:#1C1C1E;border:1px solid #2C2C2E;border-radius:10px;padding:14px 16px">
+            <div style="background:#1C1C1E;border:1px solid #2C2C2E;border-radius:10px;
+                        padding:14px 16px;">
                 <span style="font-size:20px">{icon}</span>
                 <p style="color:#FFFFFF;font-size:13px;font-weight:600;margin:8px 0 2px">{title}</p>
                 <p style="color:#8E8E93;font-size:11px;margin:0">{sub}</p>
             </div>
             """, unsafe_allow_html=True)
 
-    st.markdown('<div style="height:28px"></div>', unsafe_allow_html=True)
+    st.markdown('<div style="height:32px"></div>', unsafe_allow_html=True)
 
-    # ── IPO Tracker header ────────────────────────────────────────────────────
-    hdr, ctrl = st.columns([3, 3])
-    with hdr:
-        st.markdown("""
-        <p style="font-size:17px;font-weight:700;color:#FFFFFF;margin:0 0 2px"> IPO & New Listings Tracker</p>
-        <p style="color:#8E8E93;font-size:12px;margin:0">Live price vs IPO price · Performance since listing</p>
-        """, unsafe_allow_html=True)
-    with ctrl:
-        ca, cb, cc = st.columns([2, 2, 1])
-        with ca:
-            ipo_period = st.radio("p", ["7 Days", "30 Days", "All Time"],
-                                   horizontal=True, label_visibility="collapsed",
-                                   key="ipo_period_v2")
-        with cb:
-            type_filter = st.multiselect("t", ["STOCK", "ETF"],
-                                          default=["STOCK", "ETF"],
-                                          label_visibility="collapsed",
-                                          key="ipo_type_v2")
-        with cc:
-            if st.button("↺", key="ipo_ref_v2", help="Refresh data"):
-                fetch_ipo_performance.clear()
-                st.rerun()
+    # ── What to do next ───────────────────────────────────────────────────────
+    st.markdown("""
+    <div style="background:#0A84FF0D;border:1px solid #0A84FF33;border-radius:12px;
+                padding:20px 24px;margin-bottom:24px">
+        <p style="color:#0A84FF;font-size:13px;font-weight:600;margin:0 0 10px">
+            How to get started
+        </p>
+        <div style="display:flex;gap:32px;flex-wrap:wrap">
+            <div>
+                <p style="color:#FFFFFF;font-size:13px;font-weight:600;margin:0 0 2px">
+                    Search Mode
+                </p>
+                <p style="color:#8E8E93;font-size:12px;margin:0">
+                    Type any company name in the sidebar.<br>
+                    Works for public companies globally.
+                </p>
+            </div>
+            <div>
+                <p style="color:#FFFFFF;font-size:13px;font-weight:600;margin:0 0 2px">
+                    Upload Mode
+                </p>
+                <p style="color:#8E8E93;font-size:12px;margin:0">
+                    Toggle Upload Mode in the sidebar.<br>
+                    Drop in your Excel, CSV, or PDF.
+                </p>
+            </div>
+            <div>
+                <p style="color:#FFFFFF;font-size:13px;font-weight:600;margin:0 0 2px">
+                    Quick Access
+                </p>
+                <p style="color:#8E8E93;font-size:12px;margin:0">
+                    Use the quick access buttons in the sidebar<br>
+                    to instantly load major companies.
+                </p>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
-    st.markdown('<div style="height:10px"></div>', unsafe_allow_html=True)
-
-    # Load data based on period
-    import datetime as _dt
-    from ipo_tracker import IPO_DATABASE
-
-    if ipo_period == "All Time":
-        all_rows = []
-        for r in sorted(IPO_DATABASE, key=lambda x: x[3], reverse=True):
-            row_d = {
-                "ticker": r[0], "name": r[1], "type": r[2],
-                "ipo_date": r[3], "ipo_price": r[4], "exchange": r[5],
-                "curr_price": None, "change_pct": None, "change_dol": None,
-                "days_listed": (_dt.datetime.now() - _dt.datetime.strptime(r[3],"%Y-%m-%d")).days,
-            }
-            try:
-                ci = yf.Ticker(r[0]).info
-                cp = ci.get("currentPrice") or ci.get("regularMarketPrice") or ci.get("previousClose")
-                if cp:
-                    cp = float(cp)
-                    row_d.update({"curr_price": cp, "change_dol": cp - r[4],
-                                  "change_pct": (cp - r[4]) / r[4] * 100})
-            except Exception:
-                pass
-            all_rows.append(row_d)
-        ipo_df = pd.DataFrame(all_rows)
-    else:
-        period_arg = "Last 7 Days" if ipo_period == "7 Days" else "Last 30 Days"
-        with st.spinner(""):
-            ipo_df = fetch_ipo_performance(period_arg)
-
-    if type_filter and ipo_df is not None and not ipo_df.empty:
-        ipo_df = ipo_df[ipo_df["type"].isin(type_filter)]
-
-    if ipo_df is not None and not ipo_df.empty:
-        stats = get_ipo_stats(ipo_df)
-        if stats:
-            sc1, sc2, sc3, sc4, sc5 = st.columns(5)
-            for col, (lbl, val) in zip(
-                [sc1, sc2, sc3, sc4, sc5],
-                [("Listed",        str(stats.get("total",0))),
-                 ("Gainers ▲",     str(stats.get("gainers",0))),
-                 ("Losers ▼",      str(stats.get("losers",0))),
-                 ("Avg Return",    f"{stats.get('avg_return',0):+.1f}%"),
-                 ("Best",          f"{stats.get('best_ticker','—')} {stats.get('best_return',0):+.0f}%")],
-            ):
-                col.metric(lbl, val)
-
-        st.markdown('<div style="height:8px"></div>', unsafe_allow_html=True)
-
-        for _, row in ipo_df.iterrows():
-            chg_pct = row.get("change_pct")
-            chg_dol = row.get("change_dol")
-            curr    = row.get("curr_price")
-            if curr is not None and chg_pct is not None:
-                clr   = COLORS["success"] if chg_pct >= 0 else COLORS["danger"]
-                arrow = "▲" if chg_pct >= 0 else "▼"
-                p_str = f"<span style=\"color:#FFFFFF;font-size:16px;font-weight:700\">${curr:.2f}</span>"
-                c_str = f"<span style=\"color:{clr};font-size:11px;font-weight:600\">{arrow} ${abs(chg_dol):.2f} ({chg_pct:+.1f}% since IPO)</span>"
-                i_str = f"<span style=\"color:#48484A;font-size:10px\">IPO ${row['ipo_price']:.2f}</span>"
-            else:
-                clr   = COLORS["text_muted"]
-                p_str = "<span style=\"color:#48484A;font-size:13px\">Price pending</span>"
-                c_str = f"<span style=\"color:#48484A;font-size:10px\">IPO ${row['ipo_price']:.2f}</span>"
-                i_str = ""
-
-            tc = COLORS["primary"] if row["type"] == "STOCK" else COLORS["chart_purple"]
-            lc, rc = st.columns([5, 1])
-            with lc:
-                st.markdown(f"""
-                <div style="background:#1C1C1E;border:1px solid #2C2C2E;border-radius:10px;
-                            padding:11px 16px;display:flex;align-items:center;
-                            justify-content:space-between;margin-bottom:5px">
-                    <div style="display:flex;align-items:center;gap:10px">
-                        <span style="background:{tc}22;border:1px solid {tc}44;color:{tc};
-                                     font-size:9px;font-weight:700;padding:2px 6px;
-                                     border-radius:4px">{row["type"]}</span>
-                        <div>
-                            <span style="color:#FFFFFF;font-size:13px;font-weight:600">{row["name"]}</span>
-                            <span style="color:#48484A;font-size:11px;margin-left:8px">
-                                {row["ticker"]} · {row["exchange"]} · {row["ipo_date"]} · {row["days_listed"]}d
-                            </span>
-                        </div>
-                    </div>
-                    <div style="text-align:right;white-space:nowrap">
-                        {p_str}<br>{c_str}<br>{i_str}
-                    </div>
+    # ── What you get strip ────────────────────────────────────────────────────
+    st.markdown('<p style="color:#8E8E93;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;margin:0 0 12px">What you get for every company</p>', unsafe_allow_html=True)
+    features = [
+        ("11 KPIs",            "Calculated automatically from live financial statements"),
+        ("Health Score",       "0-100 score across profitability, growth, liquidity, leverage, cash flow"),
+        ("Variance Analysis",  "YoY change with plain-English narrative for every major line item"),
+        ("CFO Brief",          "One-click structured brief — download as PDF or PowerPoint"),
+        ("Segment Breakdown",  "Revenue by business division for major companies"),
+        ("Survival Predictor", "24-month probabilistic distress model"),
+        ("Upload Mode",        "Same analysis on your own private financials"),
+        ("Peer Benchmark",     "Side-by-side comparison against any public competitor"),
+    ]
+    r1, r2 = st.columns(2)
+    for i, (title, desc) in enumerate(features):
+        with (r1 if i % 2 == 0 else r2):
+            st.markdown(f"""
+            <div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid #1C1C1E">
+                <span style="color:#0A84FF;font-size:14px;margin-top:1px">✓</span>
+                <div>
+                    <span style="color:#FFFFFF;font-size:13px;font-weight:600">{title}</span>
+                    <span style="color:#8E8E93;font-size:12px;margin-left:6px">{desc}</span>
                 </div>
-                """, unsafe_allow_html=True)
-            with rc:
-                if st.button("Analyze →", key=f"ipo_btn_{row['ticker']}",
-                              use_container_width=True):
-                    st.session_state.ticker = row["ticker"]
-                    st.session_state.company_name = row["name"]
-                    st.session_state.chat_history = []
-                    st.session_state.cfo_brief = None
-                    st.rerun()
-    else:
-        st.info("No listings found. Try \'All Time\' to see the full database.")
+            </div>
+            """, unsafe_allow_html=True)
 
     st.markdown("""
-    <p style="color:#48484A;font-size:11px;margin-top:14px;text-align:center">
-        Yahoo Finance · Refreshes every 30 min · Not financial advice · Built by Hetal Shah
+    <p style="color:#48484A;font-size:11px;margin-top:20px;text-align:center">
+        Data via Yahoo Finance · Not financial advice · Built by Hetal Shah · github.com/Hshah168
     </p>
     """, unsafe_allow_html=True)
     st.stop()
@@ -992,15 +932,16 @@ st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
 # ─── Navigation tabs ───────────────────────────────────────────────────────────
 tabs = st.tabs([
-    " Price & Charts",
-    " Financials",
-    " KPIs & Health",
-    " Insights",
-    " News",
-    " AI Copilot",
-    " Peer Compare",
-    " Survival Predictor",
-    " Private Co. Analysis",
+    "Price & Charts",
+    "Financials",
+    "KPIs & Health",
+    "Insights",
+    "News",
+    "AI Copilot",
+    "Peer Compare",
+    "Survival Predictor",
+    "Segments",
+    "Private Co. Analysis",
 ])
 
 
@@ -1078,7 +1019,7 @@ with tabs[1]:
         csv_buf = io.StringIO()
         df.to_csv(csv_buf)
         st.download_button(
-            label=f"⬇ Download {label} CSV",
+            label=f"Download {label} CSV",
             data=csv_buf.getvalue(),
             file_name=f"{ticker}_{label.replace(' ', '_')}.csv",
             mime="text/csv",
@@ -1212,7 +1153,7 @@ with tabs[3]:
 
     gen_col, _ = st.columns([1, 3])
     with gen_col:
-        if st.button(" Generate CFO Brief", use_container_width=True):
+        if st.button("Generate CFO Brief", use_container_width=True):
             with st.spinner("Compiling CFO Brief..."):
                 news_items = get_company_news(ticker, full_name, limit=8)
                 st.session_state.cfo_brief = generate_cfo_brief(
@@ -1226,7 +1167,7 @@ with tabs[3]:
             unsafe_allow_html=True,
         )
         st.download_button(
-            "⬇ Download CFO Brief",
+            "Download CFO Brief",
             data=st.session_state.cfo_brief,
             file_name=f"{ticker}_CFO_Brief_{datetime.now().strftime('%Y%m%d')}.md",
             mime="text/markdown",
@@ -1249,13 +1190,13 @@ with tabs[3]:
 with tabs[4]:
     news_header_col, refresh_col = st.columns([3, 1])
     with news_header_col:
-        st.markdown(f"**Financial News · {full_name}**")
+        st.markdown(f"**News · {full_name}**")
         st.markdown(
             '<p style="color:#8E8E93;font-size:13px">Latest news sorted by publication date. Click headlines to read full articles.</p>',
             unsafe_allow_html=True,
         )
     with refresh_col:
-        if st.button(" Refresh News"):
+        if st.button("Refresh News"):
             st.session_state.news_refresh += 1
             get_company_news.clear()
 
@@ -1281,7 +1222,7 @@ with tabs[4]:
                     <span style="background:#2C2C2E;border-radius:5px;
                                  padding:2px 8px;font-size:11px;color:#8E8E93;
                                  font-weight:500">{publisher}</span>
-                    <span style="color:#48484A;font-size:12px"> {pub_date}</span>
+                    <span style="color:#48484A;font-size:12px">{pub_date}</span>
                     <a href="{link}" target="_blank" style="color:#0A84FF;
                        font-size:12px;text-decoration:none;margin-left:auto">Read →</a>
                 </div>
@@ -1296,7 +1237,7 @@ with tabs[5]:
     ai_left, ai_right = st.columns([2, 1])
 
     with ai_left:
-        st.markdown(f"**AI Analyst Copilot · {full_name}**")
+        st.markdown(f"**AI Copilot · {full_name}**")
         st.markdown(
             f'<p style="color:#8E8E93;font-size:13px">Ask me anything about {full_name}\'s financials, risks, growth outlook, or strategy.</p>',
             unsafe_allow_html=True,
@@ -1307,7 +1248,7 @@ with tabs[5]:
             <div style="background:#FF9F0A11;border:1px solid #FF9F0A33;
                          border-radius:10px;padding:12px 16px;margin-bottom:16px">
                 <p style="color:#FF9F0A;font-size:13px;margin:0;font-weight:500">
-                     Add your Groq API key in the sidebar for full AI responses.
+                    Tip: Add your Groq API key in the sidebar for full AI responses.
                     Rule-based answers available without a key.
                 </p>
             </div>
@@ -1364,7 +1305,7 @@ with tabs[5]:
                 st.session_state.chat_history.append({"role": "assistant", "content": response})
 
         if st.session_state.chat_history:
-            if st.button(" Clear Chat", key="clear_chat"):
+            if st.button("Clear Chat", key="clear_chat"):
                 st.session_state.chat_history = []
                 st.rerun()
 
@@ -1374,7 +1315,7 @@ with tabs[5]:
         <div style="background:#1C1C1E;border:1px solid #2C2C2E;border-radius:12px;padding:16px">
             <p style="color:#8E8E93;font-size:11px;text-transform:uppercase;letter-spacing:0.8px;margin:0 0 12px">The AI has access to:</p>
             {''.join([
-                f'<p style="color:#FFFFFF;font-size:13px;margin:0 0 8px"> {item}</p>'
+                f'<p style="color:#FFFFFF;font-size:13px;margin:0 0 8px">{item}</p>'
                 for item in [
                     f"{full_name} financial statements",
                     "11 calculated KPIs",
@@ -1560,7 +1501,7 @@ with tabs[6]:
 # TAB 8: SURVIVAL PREDICTOR
 # ══════════════════════════════════════════════════════════════════════════════
 with tabs[7]:
-    st.markdown("** Startup Financial Survival Predictor — Will This Company Survive 24 Months?**")
+    st.markdown("**Startup Financial Survival Predictor — Will This Company Survive the Next 24 Months?**")
     st.markdown("""
     <div style="background:#BF5AF211;border:1px solid #BF5AF233;border-radius:10px;
                 padding:12px 16px;margin-bottom:20px">
@@ -1600,9 +1541,9 @@ with tabs[7]:
     st.markdown("**Scenario Probability Distribution**")
     p1, p2, p3 = st.columns(3)
     scenarios = [
-        (" Scenario A", "Thriving", sv.prob_thriving,   COLORS["success"]),
-        (" Scenario B", "Vulnerable", sv.prob_vulnerable, COLORS["warning"]),
-        (" Scenario C", "Critical",  sv.prob_critical,   COLORS["danger"]),
+        ("Scenario A", "Thriving", sv.prob_thriving,   COLORS["success"]),
+        ("Scenario B", "Vulnerable", sv.prob_vulnerable, COLORS["warning"]),
+        ("Scenario C", "Critical",  sv.prob_critical,   COLORS["danger"]),
     ]
     for col, (label, name, pct, color) in zip([p1, p2, p3], scenarios):
         with col:
@@ -1680,26 +1621,26 @@ with tabs[7]:
     # ── Signals ───────────────────────────────────────────────────────────────
     rf_col, gf_col = st.columns(2)
     with rf_col:
-        st.markdown("**️ Distress Signals**")
+        st.markdown("**Distress Signals**")
         if sv.red_flags:
             for flag in sv.red_flags:
                 st.markdown(f"""
                 <div style="background:#FF3B3011;border:1px solid #FF3B3033;border-radius:8px;
                             padding:10px 14px;margin-bottom:6px">
-                    <p style="color:#FF3B30;font-size:12px;margin:0;line-height:1.5"> {flag}</p>
+                    <p style="color:#FF3B30;font-size:12px;margin:0;line-height:1.5">{flag}</p>
                 </div>
                 """, unsafe_allow_html=True)
         else:
-            st.markdown('<div style="background:#34C75911;border:1px solid #34C75933;border-radius:8px;padding:10px 14px"><p style="color:#34C759;font-size:13px;margin:0"> No critical distress signals detected</p></div>', unsafe_allow_html=True)
+            st.markdown('<div style="background:#34C75911;border:1px solid #34C75933;border-radius:8px;padding:10px 14px"><p style="color:#34C759;font-size:13px;margin:0">✓ No critical distress signals detected</p></div>', unsafe_allow_html=True)
 
     with gf_col:
-        st.markdown("** Strength Signals**")
+        st.markdown("**✅ Strength Signals**")
         if sv.green_flags:
             for flag in sv.green_flags:
                 st.markdown(f"""
                 <div style="background:#34C75911;border:1px solid #34C75933;border-radius:8px;
                             padding:10px 14px;margin-bottom:6px">
-                    <p style="color:#34C759;font-size:12px;margin:0;line-height:1.5"> {flag}</p>
+                    <p style="color:#34C759;font-size:12px;margin:0;line-height:1.5">{flag}</p>
                 </div>
                 """, unsafe_allow_html=True)
         else:
@@ -1726,7 +1667,7 @@ with tabs[7]:
     st.markdown("""
     <div style="background:#2C2C2E22;border-radius:8px;padding:10px 14px;margin-top:8px">
         <p style="color:#48484A;font-size:11px;margin:0">
-             Quantitative model only. Not investment advice. Does not account for management quality,
+            Note: Quantitative model only. Not investment advice. Does not account for management quality,
             market conditions, regulatory changes, or strategic pivots.
             Methodology: Modified Altman Z-Score (recalibrated for tech) · Cash runway modeling ·
             Revenue momentum decay · Distress pattern recognition from debt portfolio analysis.
@@ -1871,13 +1812,12 @@ with tabs[8]:
                     priv_name, "PRIVATE", priv_kpis, priv_score, priv_label, {},
                     api_key=groq_key or None,
                 )
-            icons = {"Revenue Trend": "", "Profitability Trend": "",
-                     "Balance Sheet Strength": "", "Cash Flow Analysis": ""}
+            icons = {"Revenue Trend": "", "Profitability Trend": "", "Balance Sheet Strength": "", "Cash Flow Analysis": ""}
             for title, text in priv_insights.items():
                 st.markdown(f"""
                 <div class="insight-card">
                     <p style="color:#0A84FF;font-size:11px;text-transform:uppercase;
-                              letter-spacing:0.8px;font-weight:700;margin:0 0 6px">{icons.get(title,"")} {title}</p>
+                              letter-spacing:0.8px;font-weight:700;margin:0 0 6px">{title}</p>
                     <p style="color:#FFFFFF;font-size:14px;line-height:1.6;margin:0">{text}</p>
                 </div>
                 """, unsafe_allow_html=True)
