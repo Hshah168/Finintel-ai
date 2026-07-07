@@ -522,78 +522,96 @@ if app_mode == "Upload Mode":
             "Cash Flow": 0,
         }
 
-    if not stmts:
+    if stmts is None or not avail:
 
-        st.markdown("""
-        <p style="font-size:16px;color:#8E8E93;margin:0 0 12px;max-width:500px;display:inline-block">
-        Analyze any company's internal financials. Public or private,<br>
-        listed or unlisted, if you have the numbers, we can analyze them.
-        </p>
-        """, unsafe_allow_html=True)
+        st.markdown(
+            """
+            <p style="
+                font-size:16px;
+                color:#8E8E93;
+                margin:0 0 12px;
+                max-width:500px;
+            ">
+            Analyze any company's internal financials. Public or private,<br>
+            listed or unlisted, if you have the numbers, we can analyze them.
+            </p>
+            """,
+            unsafe_allow_html=True
+        )
+
 
         use_cols = st.columns(3)
 
         use_cases = [
-            {
-                "title": "Internal Business Units",
-                "desc": "Analyze divisions, cost centers, management accounts, and internal P&Ls."
-            },
-            {
-                "title": "Private Companies",
-                "desc": "Generate KPIs, Health Scores, and CFO Briefs from your own financial statements."
-            },
-            {
-                "title": "Any Financial Dataset",
-                "desc": "Works with startups, nonprofits, subsidiaries, joint ventures, or any organization with financial statements."
-            },
+            (
+                "Internal Business Units",
+                "Analyze divisions, cost centers, management accounts, and internal P&Ls."
+            ),
+            (
+                "Private Companies",
+                "Generate KPIs, Health Scores, and CFO Briefs from your own financial statements."
+            ),
+            (
+                "Any Financial Dataset",
+                "Works with startups, nonprofits, subsidiaries, joint ventures, or any organization with financial statements."
+            ),
         ]
 
-        for col, item in zip(use_cols, use_cases):
+
+        for col, (title, desc) in zip(use_cols, use_cases):
 
             with col:
+
                 st.markdown(
                     f"""
                     <div style="
-                        background:#1C1C1E;
+                        background-color:#1C1C1E;
                         border:1px solid #2C2C2E;
                         border-radius:14px;
                         padding:20px;
+                        height:140px;
                         text-align:center;
-                        min-height:140px;
                     ">
 
-                        <div style="
-                            font-size:14px;
-                            font-weight:700;
-                            color:#FFFFFF;
-                            margin-bottom:10px;
-                        ">
-                            {item["title"]}
-                        </div>
+                    <h4 style="
+                        color:#FFFFFF;
+                        font-size:14px;
+                        font-weight:700;
+                        margin:0 0 12px 0;
+                    ">
+                    {title}
+                    </h4>
 
-                        <div style="
-                            font-size:12px;
-                            color:#8E8E93;
-                            line-height:1.5;
-                        ">
-                            {item["desc"]}
-                        </div>
+
+                    <p style="
+                        color:#8E8E93;
+                        font-size:12px;
+                        line-height:1.5;
+                        margin:0;
+                    ">
+                    {desc}
+                    </p>
+
 
                     </div>
                     """,
                     unsafe_allow_html=True
                 )
 
-        st.markdown("""
-        <p style="
-            text-align:center;
-            color:#48484A;
-            font-size:13px;
-            margin-top:24px;
-        ">
-        Upload your file and click <b>Analyze Financials</b> in the sidebar to begin.
-        </p>
-        """, unsafe_allow_html=True)
+
+        st.markdown(
+            """
+            <p style="
+                text-align:center;
+                color:#48484A;
+                font-size:13px;
+                margin-top:24px;
+            ">
+            Upload your file and click <b>Analyze Financials</b> in the sidebar to begin.
+            </p>
+            """,
+            unsafe_allow_html=True
+        )
 
         st.stop()
 
