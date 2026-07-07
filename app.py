@@ -345,6 +345,7 @@ with st.sidebar:
             "financials",
             type=["xlsx", "xls", "csv", "pdf"],
             label_visibility="collapsed",
+            key="upload_file",
         )
 
         st.markdown("""
@@ -418,6 +419,7 @@ with st.sidebar:
                 st.session_state.upload_peer = upload_peer_input.strip()
                 st.session_state.ticker = None  # clear search mode
                 st.success(f"Parsed: {', '.join(avail)}")
+                st.experimental_rerun()
             else:
                 st.error("Could not extract data. Check row labels and year columns.")
         elif upload_btn and not uploaded_file:
