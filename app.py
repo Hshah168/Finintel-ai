@@ -497,16 +497,10 @@ if app_mode == "Upload Mode":
     if not st.session_state.upload_statements:
 
         st.markdown("""
-        <div style="text-align:center;padding:60px 20px 30px">
-            <h1 style="font-size:32px;font-weight:800;color:#FFFFFF;margin:12px 0 8px">
-                Upload Mode
-            </h1>
-
-            <p style="font-size:16px;color:#8E8E93;margin:0 0 12px;max-width:500px;display:inline-block">
-                Analyze any company's internal financials. Public or private,<br>
-                listed or unlisted — if you have the numbers, we can analyze them.
-            </p>
-        </div>
+        <p style="font-size:16px;color:#8E8E93;margin:0 0 12px;max-width:500px;display:inline-block">
+        Analyze any company's internal financials. Public or private,<br>
+        listed or unlisted — if you have the numbers, we can analyze them.
+        </p>
         """, unsafe_allow_html=True)
 
         use_cols = st.columns(3)
