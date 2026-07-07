@@ -312,6 +312,7 @@ with st.sidebar:
                     st.session_state.cfo_brief = None
                     st.session_state.upload_statements = None
                     st.session_state.upload_company_name = None
+                    st.session_state.upload_peer = ""
 
         # ── Recently Analyzed ─────────────────────────────────────────────────
         if st.session_state.recent_companies:
@@ -408,22 +409,23 @@ with st.sidebar:
         )
 
         # Handle upload button
-        if upload_btn and uploaded_file:
-            with st.spinner("Parsing..."):
-                stmts, detected = parse_uploaded_file(uploaded_file)
-                uname = upload_name_input.strip() or detected or "My Company"
-                avail = get_available_statements(stmts)
-            if avail:
-                st.session_state.upload_statements = stmts
-                st.session_state.upload_company_name = uname
-                st.session_state.upload_peer = upload_peer_input.strip()
-                st.session_state.ticker = None  # clear search mode
-                st.success(f"Parsed: {', '.join(avail)}")
-                st.experimental_rerun()
+        if upload_btn:
+            if uploaded_file:
+                with st.spinner("Parsing..."):
+                    stmts, detected = parse_uploaded_file(uploaded_file)
+                    uname = upload_name_input.strip() or detected or "My Company"
+                    avail = get_available_statements(stmts)
+                if avail:
+                    st.session_state.upload_statements = stmts
+                    st.session_state.upload_company_name = uname
+                    st.session_state.upload_peer = upload_peer_input.strip()
+                    st.session_state.ticker = None  # clear search mode
+                    st.success(f"Parsed: {', '.join(avail)}")
+                    st.experimental_rerun()
+                else:
+                    st.error("Could not extract data. Check row labels and year columns.")
             else:
-                st.error("Could not extract data. Check row labels and year columns.")
-        elif upload_btn and not uploaded_file:
-            st.warning("Please upload a file first.")
+                st.warning("Please upload a file first.")
 
     # ── AI Settings (both modes) ──────────────────────────────────────────────
     st.markdown("---")
@@ -488,6 +490,8 @@ if search_btn and search_input.strip():
         st.session_state.chat_history = []
         st.session_state.cfo_brief = None
         st.session_state.upload_statements = None
+        st.session_state.upload_company_name = None
+        st.session_state.upload_peer = ""
     else:
         st.error(f"Could not identify a publicly traded company for **{search_input}**. Try a ticker directly.")
 
@@ -500,7 +504,12 @@ if app_mode == "Upload Mode":
     uname = st.session_state.upload_company_name or "My Company"
     upeer = st.session_state.upload_peer or ""
 
-    if stmts:
+    if stmts is None:
+        avail = []
+    else:
+        avail = get_available_statements(stmts)
+
+    if stmts and avail:
         u_kpis = calculate_kpis(stmts["income"], stmts["balance"], stmts["cashflow"], {})
         u_score, u_label, u_breakdown = calculate_health_score(u_kpis, {})
     else:
