@@ -494,90 +494,97 @@ if search_btn and search_input.strip():
 # UPLOAD MODE DASHBOARD
 # ══════════════════════════════════════════════════════════════════════════════
 if app_mode == "Upload Mode":
-    if not st.session_state.upload_statements:
+    stmts = st.session_state.upload_statements
+    uname = st.session_state.upload_company_name or "My Company"
+    upeer = st.session_state.upload_peer or ""
+
+    if stmts:
+        u_kpis = calculate_kpis(stmts["income"], stmts["balance"], stmts["cashflow"], {})
+        u_score, u_label, u_breakdown = calculate_health_score(u_kpis, {})
+    else:
+        u_kpis = {}
+        u_score, u_label, u_breakdown = 0, "N/A", {
+            "Profitability": 0,
+            "Growth": 0,
+            "Liquidity": 0,
+            "Leverage": 0,
+            "Cash Flow": 0,
+        }
+
+    if not stmts:
 
         st.markdown("""
         <p style="font-size:16px;color:#8E8E93;margin:0 0 12px;max-width:500px;display:inline-block">
         Analyze any company's internal financials. Public or private,<br>
-        listed or unlisted — if you have the numbers, we can analyze them.
+        listed or unlisted, if you have the numbers, we can analyze them.
         </p>
         """, unsafe_allow_html=True)
 
         use_cols = st.columns(3)
 
         use_cases = [
-            (
-                "Internal Business Units",
-                "Analyze divisions, cost centers, management accounts, and internal P&Ls."
-            ),
-            (
-                "Private Companies",
-                "Generate KPIs, Health Scores, and CFO Briefs from your own financial statements."
-            ),
-            (
-                "Any Financial Dataset",
-                "Works with startups, nonprofits, subsidiaries, joint ventures, or any organization with financial statements."
-            ),
+            {
+                "title": "Internal Business Units",
+                "desc": "Analyze divisions, cost centers, management accounts, and internal P&Ls."
+            },
+            {
+                "title": "Private Companies",
+                "desc": "Generate KPIs, Health Scores, and CFO Briefs from your own financial statements."
+            },
+            {
+                "title": "Any Financial Dataset",
+                "desc": "Works with startups, nonprofits, subsidiaries, joint ventures, or any organization with financial statements."
+            },
         ]
 
         for col, item in zip(use_cols, use_cases):
-            title, desc = item
 
             with col:
-                st.markdown(f"""
-                <div style="
-                    background:#1C1C1E;
-                    border:1px solid #2C2C2E;
-                    border-radius:14px;
-                    padding:20px;
-                    text-align:center;
-                    min-height:140px;
-                ">
-                    <p style="font-size:14px;font-weight:700;color:#FFFFFF;">
-                        {title}
-                    </p>
+                st.markdown(
+                    f"""
+                    <div style="
+                        background:#1C1C1E;
+                        border:1px solid #2C2C2E;
+                        border-radius:14px;
+                        padding:20px;
+                        text-align:center;
+                        min-height:140px;
+                    ">
 
-                    <p style="font-size:12px;color:#8E8E93;line-height:1.5;">
-                        {desc}
-                    </p>
-                </div>
-                """, unsafe_allow_html=True)
+                        <div style="
+                            font-size:14px;
+                            font-weight:700;
+                            color:#FFFFFF;
+                            margin-bottom:10px;
+                        ">
+                            {item["title"]}
+                        </div>
+
+                        <div style="
+                            font-size:12px;
+                            color:#8E8E93;
+                            line-height:1.5;
+                        ">
+                            {item["desc"]}
+                        </div>
+
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
 
         st.markdown("""
-        <p style="text-align:center;color:#48484A;font-size:13px;margin-top:24px">
+        <p style="
+            text-align:center;
+            color:#48484A;
+            font-size:13px;
+            margin-top:24px;
+        ">
         Upload your file and click <b>Analyze Financials</b> in the sidebar to begin.
         </p>
         """, unsafe_allow_html=True)
 
         st.stop()
-
-    # ── Upload mode has data — run full analysis ──────────────────────────────
-    stmts = st.session_state.upload_statements
-    uname = st.session_state.upload_company_name
-    upeer = st.session_state.upload_peer
-
-    u_kpis = calculate_kpis(stmts["income"], stmts["balance"], stmts["cashflow"], {})
-    u_score, u_label, u_breakdown = calculate_health_score(u_kpis, {})
-
-    # Header
-    st.markdown(f"""
-    <div style="display:flex;align-items:center;justify-content:space-between;
-        padding:20px 0 16px;border-bottom:1px solid #1C1C1E;margin-bottom:20px;flex-wrap:wrap;gap:16px">
-        <div>
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
-                <h1 style="font-size:28px;font-weight:800;color:#FFFFFF;margin:0">{uname}</h1>
-                <span style="background:#1C1C1E;border:1px solid #2C2C2E;border-radius:6px;
-                             padding:3px 10px;font-size:12px;color:#8E8E93;font-weight:600">UPLOADED</span>
-            </div>
-            <p style="color:#8E8E93;font-size:13px;margin:0">Internal financial data · Confidential analysis</p>
-        </div>
-        <div style="text-align:right">
-            <p style="font-size:14px;color:#8E8E93;margin:0">Financial Health</p>
-            <p style="font-size:32px;font-weight:800;color:{'#34C759' if u_score>=75 else '#0A84FF' if u_score>=55 else '#FF9F0A' if u_score>=35 else '#FF3B30'};margin:0">{u_score}/100</p>
-            <p style="color:#8E8E93;font-size:13px;margin:0">{u_label}</p>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
 
     # KPI strip
     strip_data = [
