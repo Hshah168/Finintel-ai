@@ -495,11 +495,13 @@ if search_btn and search_input.strip():
 # ══════════════════════════════════════════════════════════════════════════════
 if app_mode == "Upload Mode":
     if not st.session_state.upload_statements:
-        # Upload mode landing
+
         st.markdown("""
         <div style="text-align:center;padding:60px 20px 30px">
-            
-            <h1 style="font-size:32px;font-weight:800;color:#FFFFFF;margin:12px 0 8px">Upload Mode</h1>
+            <h1 style="font-size:32px;font-weight:800;color:#FFFFFF;margin:12px 0 8px">
+                Upload Mode
+            </h1>
+
             <p style="font-size:16px;color:#8E8E93;margin:0 0 12px;max-width:500px;display:inline-block">
                 Analyze any company's internal financials. Public or private,<br>
                 listed or unlisted — if you have the numbers, we can analyze them.
@@ -508,26 +510,51 @@ if app_mode == "Upload Mode":
         """, unsafe_allow_html=True)
 
         use_cols = st.columns(3)
+
         use_cases = [
-            ("Internal Business Units", "Analyze divisions, cost centers, management accounts, and internal P&Ls."),
-            ("Private Companies", "Generate KPIs, Health Scores, and CFO Briefs from your own financial statements."),
-            ("Any Financial Dataset", "Works with startups, nonprofits, subsidiaries, joint ventures, or any organization with financial statements."),
+            (
+                "Internal Business Units",
+                "Analyze divisions, cost centers, management accounts, and internal P&Ls."
+            ),
+            (
+                "Private Companies",
+                "Generate KPIs, Health Scores, and CFO Briefs from your own financial statements."
+            ),
+            (
+                "Any Financial Dataset",
+                "Works with startups, nonprofits, subsidiaries, joint ventures, or any organization with financial statements."
+            ),
         ]
-        for col, (icon, title, desc) in zip(use_cols, use_cases):
+
+        for col, item in zip(use_cols, use_cases):
+            title, desc = item
+
             with col:
                 st.markdown(f"""
-                <div style="background:#1C1C1E;border:1px solid #2C2C2E;border-radius:14px;
-                            padding:20px;text-align:center;min-height:140px">
-                    <p style="font-size:14px;font-weight:700;color:#FFFFFF;margin:0 0 6px">{title}</p>
-                    <p style="font-size:12px;color:#8E8E93;margin:0;line-height:1.5">{desc}</p>
+                <div style="
+                    background:#1C1C1E;
+                    border:1px solid #2C2C2E;
+                    border-radius:14px;
+                    padding:20px;
+                    text-align:center;
+                    min-height:140px;
+                ">
+                    <p style="font-size:14px;font-weight:700;color:#FFFFFF;">
+                        {title}
+                    </p>
+
+                    <p style="font-size:12px;color:#8E8E93;line-height:1.5;">
+                        {desc}
+                    </p>
                 </div>
                 """, unsafe_allow_html=True)
 
         st.markdown("""
         <p style="text-align:center;color:#48484A;font-size:13px;margin-top:24px">
-            Upload your file and click Analyze Financials in the sidebar to begin
+        Upload your file and click <b>Analyze Financials</b> in the sidebar to begin.
         </p>
         """, unsafe_allow_html=True)
+
         st.stop()
 
     # ── Upload mode has data — run full analysis ──────────────────────────────
