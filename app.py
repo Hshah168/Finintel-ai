@@ -509,16 +509,15 @@ if app_mode == "Upload Mode":
 
         use_cols = st.columns(3)
         use_cases = [
-            ("Public Companies", "Analyze internal divisions, management accounts, or unreported segment data not in public filings."),
-            ("Private Companies", "Get the same KPIs, health score, and CFO Brief as any public company — from your own data."),
-            ("Any Organization", "Startups, nonprofits, subsidiaries, joint ventures. If it has a P&L, this works."),
+            ("Internal Business Units", "Analyze divisions, cost centers, management accounts, and internal P&Ls."),
+            ("Private Companies", "Generate KPIs, Health Scores, and CFO Briefs from your own financial statements."),
+            ("Any Financial Dataset", "Works with startups, nonprofits, subsidiaries, joint ventures, or any organization with financial statements."),
         ]
         for col, (icon, title, desc) in zip(use_cols, use_cases):
             with col:
                 st.markdown(f"""
                 <div style="background:#1C1C1E;border:1px solid #2C2C2E;border-radius:14px;
                             padding:20px;text-align:center;min-height:140px">
-                    <p style="font-size:28px;margin:0 0 8px">{icon}</p>
                     <p style="font-size:14px;font-weight:700;color:#FFFFFF;margin:0 0 6px">{title}</p>
                     <p style="font-size:12px;color:#8E8E93;margin:0;line-height:1.5">{desc}</p>
                 </div>
