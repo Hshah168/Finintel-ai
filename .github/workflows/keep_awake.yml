@@ -1,0 +1,19 @@
+name: Keep Streamlit Awake
+on:
+  schedule:
+    - cron: '0 0 */3 * *' # Runs automatically every 3 days at midnight
+  workflow_dispatch: # Allows you to manually trigger it anytime to test
+
+jobs:
+  reset-timer:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        
+      - name: Push Empty Commit
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email '41898282+github-actions[bot]@://github.com'
+          git commit --allow-empty -m "Automated backend keep-awake ping"
+          git push origin HEAD:${{ github.ref }}
