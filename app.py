@@ -65,14 +65,22 @@ def fetch_public_company_directory() -> list[dict]:
         response = requests.get(url, headers=headers, timeout=15)
         response.raise_for_status()
         payload = response.json()
-        rows = payload.values() if isinstance(payload, dict) else payload
+        if isinstance(payload, dict) and isinstance(payload.get("data"), list):
+            fields = payload.get("fields", [])
+            rows = [
+                dict(zip(fields, values))
+                for values in payload["data"]
+                if isinstance(values, (list, tuple))
+            ]
+        else:
+            rows = payload.values() if isinstance(payload, dict) else payload
         companies = []
         seen = set()
         for row in rows:
             if not isinstance(row, dict):
                 continue
             ticker = str(row.get("ticker", "")).strip().upper()
-            name = str(row.get("title", "")).strip()
+            name = str(row.get("title", row.get("name", ""))).strip()
             exchange = str(row.get("exchange", "")).strip()
             if not ticker or not name or not exchange:
                 continue
