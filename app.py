@@ -896,42 +896,81 @@ if not st.session_state.ticker:
     render_ipo_tracker(compact=True)
     st.markdown('<div style="height:32px"></div>', unsafe_allow_html=True)
 
-    # ── What to do next ───────────────────────────────────────────────────────
+    # ── How to get started ────────────────────────────────────────────────────
     st.markdown("""
-    <div style="background:#0A84FF0D;border:1px solid #0A84FF33;border-radius:12px;
-                padding:20px 24px;margin-bottom:24px">
-        <p style="color:#0A84FF;font-size:13px;font-weight:600;margin:0 0 10px">
-            How to get started
-        </p>
-        <div style="display:flex;gap:32px;flex-wrap:wrap">
+    <div style="background:linear-gradient(135deg,#111827 0%,#101522 100%);
+                border:1px solid #29354A;border-radius:16px;padding:24px 26px;
+                margin-bottom:24px;box-shadow:0 8px 28px rgba(0,0,0,0.16)">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;
+                    gap:16px;flex-wrap:wrap;margin-bottom:22px">
             <div>
-                <p style="color:#FFFFFF;font-size:13px;font-weight:600;margin:0 0 2px">
-                    Search Mode
+                <p style="color:#60A5FA;font-size:11px;font-weight:700;margin:0 0 7px;
+                          text-transform:uppercase;letter-spacing:1.3px">
+                    YOUR FIRST ANALYSIS
                 </p>
-                <p style="color:#8E8E93;font-size:12px;margin:0">
-                    Type any company name in the sidebar.<br>
-                    Works for public companies globally.
+                <p style="color:#FFFFFF;font-size:22px;font-weight:700;line-height:1.25;
+                          margin:0 0 7px">
+                    From financial data to a clearer business picture.
+                </p>
+                <p style="color:#A7B2C4;font-size:13px;line-height:1.6;margin:0;max-width:650px">
+                    Choose a public company or bring your own financials. FinIntel AI organizes
+                    the numbers into key metrics, business signals, and decision-ready insights.
                 </p>
             </div>
-            <div>
-                <p style="color:#FFFFFF;font-size:13px;font-weight:600;margin:0 0 2px">
-                    Upload Mode
-                </p>
-                <p style="color:#8E8E93;font-size:12px;margin:0">
-                    Toggle Upload Mode in the sidebar.<br>
-                    Drop in your Excel, CSV, or PDF.
+            <div style="background:#17243A;border:1px solid #30415C;border-radius:10px;
+                        padding:9px 12px;color:#BFDBFE;font-size:11px;font-weight:600;
+                        white-space:nowrap">
+                3 simple steps
+            </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
+                    gap:12px">
+            <div style="background:#171E2B;border:1px solid #2B3547;border-radius:12px;
+                        padding:16px 15px;min-width:0">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:11px">
+                    <span style="display:flex;align-items:center;justify-content:center;
+                                 width:29px;height:29px;border-radius:8px;background:#1D3554;
+                                 color:#93C5FD;font-size:13px;font-weight:700;flex-shrink:0">01</span>
+                    <span style="color:#FFFFFF;font-size:14px;font-weight:650">Choose your data</span>
+                </div>
+                <p style="color:#C5CEDB;font-size:12px;line-height:1.65;margin:0">
+                    <b style="color:#FFFFFF">Public company?</b> Use Search Mode or Quick Access
+                    in the sidebar to load a company.
+                    <br><br>
+                    <b style="color:#FFFFFF">Your own financials?</b> Switch to Upload Mode.
                 </p>
             </div>
-            <div>
-                <p style="color:#FFFFFF;font-size:13px;font-weight:600;margin:0 0 2px">
-                    Quick Access
+            <div style="background:#171E2B;border:1px solid #2B3547;border-radius:12px;
+                        padding:16px 15px;min-width:0">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:11px">
+                    <span style="display:flex;align-items:center;justify-content:center;
+                                 width:29px;height:29px;border-radius:8px;background:#1D3554;
+                                 color:#93C5FD;font-size:13px;font-weight:700;flex-shrink:0">02</span>
+                    <span style="color:#FFFFFF;font-size:14px;font-weight:650">Review the signals</span>
+                </div>
+                <p style="color:#C5CEDB;font-size:12px;line-height:1.65;margin:0">
+                    Explore financial statements, 11 KPIs, the 0–100 Health Score, year-over-year
+                    changes, and peer comparisons where available.
                 </p>
-                <p style="color:#8E8E93;font-size:12px;margin:0">
-                    Use the quick access buttons in the sidebar<br>
-                    to instantly load major companies.
+            </div>
+            <div style="background:#171E2B;border:1px solid #2B3547;border-radius:12px;
+                        padding:16px 15px;min-width:0">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:11px">
+                    <span style="display:flex;align-items:center;justify-content:center;
+                                 width:29px;height:29px;border-radius:8px;background:#1D3554;
+                                 color:#93C5FD;font-size:13px;font-weight:700;flex-shrink:0">03</span>
+                    <span style="color:#FFFFFF;font-size:14px;font-weight:650">Turn insight into action</span>
+                </div>
+                <p style="color:#C5CEDB;font-size:12px;line-height:1.65;margin:0">
+                    Generate a CFO Brief, explore the AI Copilot for follow-up questions, and
+                    export a report when you need a shareable summary.
                 </p>
             </div>
         </div>
+        <p style="color:#8794A8;font-size:11px;line-height:1.5;margin:15px 0 0">
+            Tip: Start with a company you know, then compare its performance with a competitor.
+            Available metrics and history can vary by company and data source.
+        </p>
     </div>
     """, unsafe_allow_html=True)
 
