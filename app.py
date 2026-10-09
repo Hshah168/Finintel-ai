@@ -35,6 +35,7 @@ from survival_predictor import predict_survival
 from export_engine import generate_pdf, generate_pptx
 from variance_analysis import build_variance_table, format_variance_df
 from segment_analysis import build_segment_revenue_estimates, get_segment_description
+from ipo_filings import render_ipo_tracker
 
 # ─── Load Groq API key ────────────────────────────────────────────────────────
 def _load_groq_key() -> str | None:
@@ -841,6 +842,10 @@ if not st.session_state.ticker:
 
     st.markdown('<div style="height:32px"></div>', unsafe_allow_html=True)
 
+    # ── Live IPO filing discovery ───────────────────────────────────────────
+    render_ipo_tracker(compact=True)
+    st.markdown('<div style="height:32px"></div>', unsafe_allow_html=True)
+
     # ── What to do next ───────────────────────────────────────────────────────
     st.markdown("""
     <div style="background:#0A84FF0D;border:1px solid #0A84FF33;border-radius:12px;
@@ -998,6 +1003,7 @@ tabs = st.tabs([
     "Survival Predictor",
     "Segments",
     "Private Co. Analysis",
+    "IPO Tracker",
 ])
 
 
@@ -1991,3 +1997,10 @@ with tabs[8]:
             file_name="FinIntel_Private_Company_Template.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 11: IPO FILING TRACKER
+# ══════════════════════════════════════════════════════════════════════════════
+with tabs[10]:
+    render_ipo_tracker(compact=False)
