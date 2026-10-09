@@ -4,6 +4,7 @@ import numpy as np
 import yfinance as yf
 import plotly.graph_objects as go
 import io
+import requests
 from datetime import datetime
 
 from company_search import resolve_ticker, get_company_info
@@ -50,6 +51,40 @@ def _load_groq_key() -> str | None:
     if key and key.startswith("gsk_"):
         return key
     return None
+
+# ─── Public company directory ──────────────────────────────────────────────────
+@st.cache_data(ttl=86400, show_spinner=False)
+def fetch_public_company_directory() -> list[dict]:
+    """Return current exchange-listed company names and tickers from SEC data."""
+    url = "https://www.sec.gov/files/company_tickers_exchange.json"
+    headers = {
+        "User-Agent": "FinIntel AI research app (https://github.com/Hshah168/Finintel-ai)",
+        "Accept-Encoding": "gzip, deflate",
+    }
+    try:
+        response = requests.get(url, headers=headers, timeout=15)
+        response.raise_for_status()
+        payload = response.json()
+        rows = payload.values() if isinstance(payload, dict) else payload
+        companies = []
+        seen = set()
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            ticker = str(row.get("ticker", "")).strip().upper()
+            name = str(row.get("title", "")).strip()
+            exchange = str(row.get("exchange", "")).strip()
+            if not ticker or not name or not exchange:
+                continue
+            key = (ticker, name)
+            if key in seen:
+                continue
+            seen.add(key)
+            companies.append({"ticker": ticker, "name": name, "exchange": exchange})
+        return sorted(companies, key=lambda item: (item["name"].casefold(), item["ticker"]))
+    except (requests.RequestException, ValueError, TypeError):
+        return []
+
 
 # ─── Page config ──────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -315,6 +350,42 @@ with st.sidebar:
                     st.session_state.upload_company_name = None
                     st.session_state.upload_peer = ""
 
+        # Dynamic directory of publicly traded companies. SEC ticker data is
+        # refreshed daily, so newly added exchange-listed companies appear
+        # without requiring a code change.
+        public_companies = fetch_public_company_directory()
+        if public_companies:
+            st.markdown(
+                '<p style="color:#8E8E93;font-size:11px;font-weight:600;'
+                'text-transform:uppercase;letter-spacing:0.8px;margin:12px 0 6px">'
+                'Browse Public Companies</p>',
+                unsafe_allow_html=True,
+            )
+            company_options = {
+                f"{item['name']} ({item['ticker']})": item
+                for item in public_companies
+            }
+            selected_company = st.selectbox(
+                "Find any listed company",
+                options=list(company_options.keys()),
+                index=None,
+                placeholder="Search company name or ticker…",
+                label_visibility="collapsed",
+                key="public_company_directory",
+            )
+            if selected_company and st.button(
+                "Analyze Selected Company", key="analyze_public_company",
+                use_container_width=True,
+            ):
+                selected = company_options[selected_company]
+                st.session_state.ticker = selected["ticker"]
+                st.session_state.company_name = selected["name"]
+                st.session_state.chat_history = []
+                st.session_state.cfo_brief = None
+                st.session_state.upload_statements = None
+                st.session_state.upload_company_name = None
+                st.session_state.upload_peer = ""
+
         # ── Recently Analyzed ─────────────────────────────────────────────────
         if st.session_state.recent_companies:
             st.markdown("---")
@@ -428,38 +499,9 @@ with st.sidebar:
             else:
                 st.warning("Please upload a file first.")
 
-    # ── AI Settings (both modes) ──────────────────────────────────────────────
-    st.markdown("---")
-    st.markdown('<p style="color:#8E8E93;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px">AI Settings</p>', unsafe_allow_html=True)
-    _server_key = _load_groq_key()
-    if _server_key:
-        groq_key = _server_key
-        st.markdown("""
-        <div style="background:#34C75911;border:1px solid #34C75933;border-radius:8px;padding:10px 12px">
-            <p style="color:#34C759;font-size:12px;font-weight:600;margin:0">AI Analysis Active</p>
-            <p style="color:#8E8E93;font-size:11px;margin:4px 0 0">Powered by Groq · Llama 3.3 70B</p>
-        </div>
-        """, unsafe_allow_html=True)
-    else:
-        groq_key = st.text_input(
-            "Groq API Key",
-            type="password",
-            placeholder="gsk_...",
-            help="Get a free key at console.groq.com",
-            label_visibility="collapsed",
-        )
-        if groq_key:
-            st.success("AI mode enabled")
-        else:
-            st.markdown("""
-            <div style="background:#FF9F0A11;border:1px solid #FF9F0A33;border-radius:8px;padding:10px 12px">
-                <p style="color:#FF9F0A;font-size:11px;font-weight:500;margin:0">
-                    AI features need a Groq key.<br>
-                    Get one free at <a href="https://console.groq.com" target="_blank"
-                    style="color:#FF9F0A">console.groq.com</a>
-                </p>
-            </div>
-            """, unsafe_allow_html=True)
+    # Keep AI features configured from Streamlit secrets or environment variables;
+    # no API-key settings are exposed in the sidebar.
+    groq_key = _load_groq_key()
 
     st.markdown("---")
     st.markdown("""
