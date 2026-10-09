@@ -8,7 +8,7 @@ from __future__ import annotations
 import re
 import xml.etree.ElementTree as ET
 from datetime import date, datetime, timedelta
-from html import unescape
+from html import escape, unescape
 
 import pandas as pd
 import requests
@@ -186,16 +186,21 @@ def render_ipo_tracker(compact: bool = False) -> None:
         filed = str(row.get("Filed", "Date unavailable"))
         summary = str(row.get("Summary", ""))
         url = str(row.get("Filing", ""))
+        company_html = escape(str(row["Company"]))
+        summary_html = escape(summary[:240])
+        url_html = (
+            f'<a href="{escape(url, quote=True)}" target="_blank" rel="noopener noreferrer" '
+            f'style="color:#0A84FF;font-size:12px;text-decoration:none">View SEC filing ↗</a>'
+            if url.startswith("https://www.sec.gov/") else ""
+        )
         st.markdown(
             f'<div style="background:#1C1C1E;border:1px solid #2C2C2E;border-radius:12px;'
             f'padding:15px 18px;margin:10px 0">'
             f'<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">'
-            f'<div><p style="color:#FFFFFF;font-size:14px;font-weight:700;margin:0 0 5px">{row["Company"]}</p>'
-            f'<p style="color:#8E8E93;font-size:11px;margin:0">{form} · {form_label} · Filed {filed}</p>'
-            f'<p style="color:#8E8E93;font-size:12px;line-height:1.5;margin:8px 0 0">{summary[:240]}</p></div>'
-            f'<div style="min-width:105px;text-align:right">'
-            f'{"<a href=\"" + url + "\" target=\"_blank\" rel=\"noopener noreferrer\" style=\"color:#0A84FF;font-size:12px;text-decoration:none\">View SEC filing ↗</a>" if url.startswith("https://www.sec.gov/") else ""}'
-            f'</div></div></div>',
+            f'<div><p style="color:#FFFFFF;font-size:14px;font-weight:700;margin:0 0 5px">{company_html}</p>'
+            f'<p style="color:#8E8E93;font-size:11px;margin:0">{escape(form)} · {escape(form_label)} · Filed {escape(filed)}</p>'
+            f'<p style="color:#8E8E93;font-size:12px;line-height:1.5;margin:8px 0 0">{summary_html}</p></div>'
+            f'<div style="min-width:105px;text-align:right">{url_html}</div></div></div>',
             unsafe_allow_html=True,
         )
 
