@@ -621,32 +621,64 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-# ─── Top-right links and theme control ────────────────────────────────────────
-top_spacer, linkedin_col, github_col, theme_col = st.columns([6.2, 1.15, 1.05, 1.45])
-with linkedin_col:
-    st.markdown(
-        '<div style="display:flex;justify-content:flex-end;padding-top:5px">'
-        '<a aria-label="LinkedIn profile" title="LinkedIn profile" '
-        'href="https://www.linkedin.com/in/shah-hetal/" target="_blank" rel="noopener noreferrer" '
-        'style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;'
-        'border:1px solid #64748B55;border-radius:10px;color:#0A66C2;text-decoration:none">'
-        '<svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" '
-        'fill="currentColor" aria-hidden="true"><path d="M19 3A2 2 0 0 1 21 5V19A2 2 0 0 1 19 21H5A2 2 0 0 1 3 19V5A2 2 0 0 1 5 3H19ZM8.34 17.34V10H5.67V17.34H8.34ZM7 8.99A1.55 1.55 0 1 0 7 5.89A1.55 1.55 0 0 0 7 8.99ZM18.34 17.34V13.32C18.34 11.17 17.19 10.17 15.66 10.17C14.42 10.17 13.86 10.85 13.55 11.33V10H10.88V17.34H13.55V13.75C13.55 12.8 13.73 11.88 14.91 11.88C16.08 11.88 16.1 12.97 16.1 13.81V17.34H18.34Z"/></svg>'
-        '</a></div>',
-        unsafe_allow_html=True,
-    )
-with github_col:
-    st.markdown(
-        '<div style="display:flex;justify-content:flex-end;padding-top:5px">'
-        '<a aria-label="GitHub profile" title="GitHub profile" '
-        'href="https://github.com/Hshah168" target="_blank" rel="noopener noreferrer" '
-        'style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;'
-        'border:1px solid #64748B55;border-radius:10px;color:#111827;text-decoration:none">'
-        '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" '
-        'fill="currentColor" aria-hidden="true"><path d="M12 .9A11.1 11.1 0 0 0 8.49 22.53c.55.1.76-.24.76-.53v-2.08c-3.1.68-3.76-1.32-3.76-1.32-.5-1.29-1.24-1.63-1.24-1.63-1.02-.7.08-.69.08-.69 1.13.08 1.73 1.16 1.73 1.16 1 1.72 2.63 1.22 3.27.93.1-.72.39-1.22.71-1.5-2.48-.28-5.09-1.24-5.09-5.53 0-1.22.44-2.22 1.16-3-.12-.28-.5-1.42.11-2.96 0 0 .95-.3 3.05 1.15a10.6 10.6 0 0 1 5.55 0c2.1-1.45 3.05-1.15 3.05-1.15.61 1.54.23 2.68.11 2.96.72.78 1.16 1.78 1.16 3 0 4.3-2.61 5.25-5.1 5.52.4.35.75 1.03.75 2.08V22c0 .29.2.63.76.52A11.1 11.1 0 0 0 12 .9Z"/></svg>'
-        '</a></div>',
-        unsafe_allow_html=True,
-    )
+# ─── Social links beside Streamlit's top-right Share control ─────────────────
+# Fixed positioning keeps the profile icons in the app header area rather than
+# consuming space in the page's content layout.
+st.markdown(
+    """
+    <style>
+    .finintel-header-social {
+        position: fixed;
+        top: 0.48rem;
+        right: 6.9rem;
+        z-index: 1000020;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+    }
+    .finintel-header-social a {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border: 1px solid rgba(148,163,184,.42);
+        border-radius: 9px;
+        background: var(--background-color, #0E1117);
+        color: var(--text-color, #F8FAFC);
+        text-decoration: none;
+        transition: border-color .15s ease, transform .15s ease;
+    }
+    .finintel-header-social a:hover {
+        border-color: #60A5FA;
+        transform: translateY(-1px);
+    }
+    .finintel-header-social .finintel-linkedin { color: #0A66C2; }
+    @media (max-width: 640px) {
+        .finintel-header-social { right: 5.6rem; top: .5rem; gap: 4px; }
+        .finintel-header-social a { width: 28px; height: 28px; }
+    }
+    </style>
+    <div class="finintel-header-social">
+      <a class="finintel-linkedin" aria-label="LinkedIn profile" title="LinkedIn profile"
+         href="https://www.linkedin.com/in/shah-hetal/" target="_blank" rel="noopener noreferrer">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M19 3A2 2 0 0 1 21 5V19A2 2 0 0 1 19 21H5A2 2 0 0 1 3 19V5A2 2 0 0 1 5 3H19ZM8.34 17.34V10H5.67V17.34H8.34ZM7 8.99A1.55 1.55 0 1 0 7 5.89A1.55 1.55 0 0 0 7 8.99ZM18.34 17.34V13.32C18.34 11.17 17.19 10.17 15.66 10.17C14.42 10.17 13.86 10.85 13.55 11.33V10H10.88V17.34H13.55V13.75C13.55 12.8 13.73 11.88 14.91 11.88C16.08 11.88 16.1 12.97 16.1 13.81V17.34H18.34Z"/>
+        </svg>
+      </a>
+      <a aria-label="GitHub profile" title="GitHub profile"
+         href="https://github.com/Hshah168" target="_blank" rel="noopener noreferrer">
+        <svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M12 .9A11.1 11.1 0 0 0 8.49 22.53c.55.1.76-.24.76-.53v-2.08c-3.1.68-3.76-1.32-3.76-1.32-.5-1.29-1.24-1.63-1.24-1.63-1.02-.7.08-.69.08-.69 1.13.08 1.73 1.16 1.73 1.16 1 1.72 2.63 1.22 3.27.93.1-.72.39-1.22.71-1.5-2.48-.28-5.09-1.24-5.09-5.53 0-1.22.44-2.22 1.16-3-.12-.28-.5-1.42.11-2.96 0 0 .95-.3 3.05 1.15a10.6 10.6 0 0 1 5.55 0c2.1-1.45 3.05-1.15 3.05-1.15.61 1.54.23 2.68.11 2.96.72.78 1.16 1.78 1.16 3 0 4.3-2.61 5.25-5.1 5.52.4.35.75 1.03.75 2.08V22c0 .29.2.63.76.52A11.1 11.1 0 0 0 12 .9Z"/>
+        </svg>
+      </a>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+# Keep the theme selector in the page layout, aligned to the right.
+_theme_spacer, theme_col = st.columns([10, 1.35])
 with theme_col:
     st.selectbox(
         "Theme",
