@@ -892,10 +892,6 @@ if not st.session_state.ticker:
 
     st.markdown('<div style="height:32px"></div>', unsafe_allow_html=True)
 
-    # ── Live IPO filing discovery ───────────────────────────────────────────
-    render_ipo_tracker(compact=True)
-    st.markdown('<div style="height:32px"></div>', unsafe_allow_html=True)
-
     # ── How to get started ────────────────────────────────────────────────────
     st.markdown("""
     <div style="background:linear-gradient(135deg,#111827 0%,#101522 100%);
@@ -973,6 +969,10 @@ if not st.session_state.ticker:
         </p>
     </div>
     """, unsafe_allow_html=True)
+
+    # ── Live IPO filing discovery — placed after the first-analysis guide ─────
+    render_ipo_tracker(compact=True)
+    st.markdown('<div style="height:32px"></div>', unsafe_allow_html=True)
 
     # ── What you get strip ────────────────────────────────────────────────────
     st.markdown('<p style="color:#8E8E93;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;margin:0 0 12px">What you get for every company</p>', unsafe_allow_html=True)
