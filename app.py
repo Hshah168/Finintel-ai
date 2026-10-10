@@ -1216,9 +1216,17 @@ if not st.session_state.ticker:
             trend_layout["margin"] = dict(l=18, r=18, t=20, b=28)
             trend_layout["yaxis"]["tickprefix"] = "$"
             trend_layout["yaxis"]["ticksuffix"] = "B"
+            chart_is_light = st.session_state.get("theme_mode", "Dark") == "Light"
+            chart_text = "#334155" if chart_is_light else "#FFFFFF"
+            chart_muted = "#64748B" if chart_is_light else "#8E8E93"
+            chart_grid = "#E2E8F0" if chart_is_light else "#2C2C2E"
+            trend_layout["font"] = dict(color=chart_text, family="Inter, system-ui, sans-serif")
+            trend_layout["xaxis"].update(gridcolor=chart_grid, linecolor=chart_grid, tickfont=dict(color=chart_muted))
+            trend_layout["yaxis"].update(gridcolor=chart_grid, linecolor=chart_grid, tickfont=dict(color=chart_muted))
             trend_layout["legend"] = dict(
                 orientation="h", yanchor="bottom", y=1.02,
                 xanchor="left", x=0, bgcolor="rgba(0,0,0,0)",
+                font=dict(color=chart_text),
             )
             trend_fig.update_layout(**trend_layout)
             st.plotly_chart(
@@ -1298,9 +1306,13 @@ if not st.session_state.ticker:
                 peer_layout["barmode"] = "group"
                 peer_layout["margin"] = dict(l=12, r=12, t=24, b=36)
                 peer_layout["yaxis"]["ticksuffix"] = "%"
+                peer_layout["font"] = dict(color=chart_text, family="Inter, system-ui, sans-serif")
+                peer_layout["xaxis"].update(gridcolor=chart_grid, linecolor=chart_grid, tickfont=dict(color=chart_muted))
+                peer_layout["yaxis"].update(gridcolor=chart_grid, linecolor=chart_grid, tickfont=dict(color=chart_muted))
                 peer_layout["legend"] = dict(
                     orientation="h", yanchor="bottom", y=1.02,
                     xanchor="left", x=0, bgcolor="rgba(0,0,0,0)",
+                    font=dict(color=chart_text),
                 )
                 peer_fig.update_layout(**peer_layout)
                 st.plotly_chart(
