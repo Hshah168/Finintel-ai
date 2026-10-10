@@ -314,7 +314,57 @@ if st.session_state.get("theme_mode", "Dark") == "Light":
     [data-testid="stRadio"] { color:#111827 !important; }
     .stApp [data-testid="stMarkdownContainer"] h1 { color:#111827 !important; }
     .stApp [data-testid="stMarkdownContainer"] p { color:#374151; }
-    .stApp a { color:#1D4ED8; }
+    .stApp a { color:#1D4ED8 !important; }
+
+    /* Force readable dark text across Streamlit widgets and custom components. */
+    .stApp, .stApp p, .stApp span, .stApp label, .stApp li,
+    .stApp div[data-testid="stMarkdownContainer"],
+    .stApp div[data-testid="stMarkdownContainer"] *,
+    .stApp [data-testid="stCaptionContainer"],
+    .stApp [data-testid="stCaptionContainer"] *,
+    .stApp [data-testid="stWidgetLabel"],
+    .stApp [data-testid="stWidgetLabel"] *,
+    .stApp [data-testid="stMetricLabel"],
+    .stApp [data-testid="stMetricValue"],
+    .stApp [data-testid="stMetricDelta"],
+    .stApp [data-testid="stExpander"] summary,
+    .stApp [data-testid="stExpander"] summary *,
+    .stApp [data-testid="stDataFrame"],
+    .stApp [data-testid="stTable"],
+    .stApp [data-testid="stAlert"] *,
+    .stApp [data-testid="stRadio"] *,
+    .stApp [data-testid="stCheckbox"] *,
+    .stApp [data-testid="stSelectbox"] *,
+    .stApp [data-testid="stMultiSelect"] *,
+    .stApp [data-testid="stNumberInput"] *,
+    .stApp [data-testid="stDateInput"] *,
+    .stApp [data-testid="stFileUploader"] *,
+    .stApp [data-testid="stTabs"] button,
+    .stApp [data-testid="stTabs"] button *,
+    .stApp [data-testid="stSidebar"] *,
+    .stApp [data-testid="stHeader"] *,
+    .stApp [data-testid="stToolbar"] * {
+        color:#111827 !important;
+    }
+    .stApp [data-testid="stMetric"] {
+        background:#FFFFFF !important; border-color:#E5E7EB !important;
+    }
+    .stApp button[kind="primary"] *,
+    .stApp button[kind="secondary"] * {
+        color:#111827 !important;
+    }
+    .stApp input, .stApp textarea, .stApp [contenteditable="true"] {
+        color:#111827 !important;
+        -webkit-text-fill-color:#111827 !important;
+    }
+    .stApp input::placeholder, .stApp textarea::placeholder {
+        color:#6B7280 !important;
+        -webkit-text-fill-color:#6B7280 !important;
+    }
+    .stApp [data-testid="stChatInput"] textarea {
+        color:#111827 !important;
+        -webkit-text-fill-color:#111827 !important;
+    }
     .stTabs [data-baseweb="tab-list"] {
         background:#E9EDF4 !important; border-color:#D9E0EA !important;
     }
