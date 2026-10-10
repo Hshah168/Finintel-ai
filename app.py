@@ -1100,6 +1100,12 @@ if not st.session_state.ticker:
         'For research purposes only; not financial advice.</p>',
         unsafe_allow_html=True,
     )
+
+    # IPO discovery is intentionally placed at the bottom, after the product-first
+    # landing experience and company demo.
+    st.markdown('<div style="height:40px"></div>', unsafe_allow_html=True)
+    render_ipo_tracker(compact=True)
+
     st.stop()
 
 
