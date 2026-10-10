@@ -1150,7 +1150,177 @@ if not st.session_state.ticker:
             unsafe_allow_html=True,
         )
 
-    st.markdown('<div style="height:12px"></div>', unsafe_allow_html=True)
+    # ── Homepage financial charts ─────────────────────────────────────────────
+    st.markdown('<div style="height:34px"></div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div style="border-top:1px solid #263449;padding-top:25px;margin-bottom:4px">'
+        '<p style="font-size:11px;font-weight:700;letter-spacing:1.5px;color:#60A5FA;'
+        'text-transform:uppercase;margin:0 0 8px">A closer look at performance</p>'
+        '<h2 style="font-size:26px;font-weight:750;letter-spacing:-.7px;'
+        'color:var(--landing-heading,#FFFFFF);margin:0 0 7px">See the story behind the numbers.</h2>'
+        '<p style="font-size:13px;line-height:1.6;color:var(--landing-copy,#9CAEC4);'
+        'margin:0 0 18px">Explore reported financial trends, then compare the business with its peers.</p>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+    chart_left, chart_right = st.columns([1.3, 0.9], gap="large")
+    with chart_left:
+        st.markdown(
+            '<div style="font-size:15px;font-weight:700;margin:0 0 4px">Revenue & operating income</div>'
+            '<div style="font-size:11px;color:#8998AD;margin-bottom:8px">Annual reported financials · USD billions</div>',
+            unsafe_allow_html=True,
+        )
+        chart_income = snapshot.get("income")
+        revenue_key = next(
+            (key for key in ["Total Revenue", "Revenue", "Net Revenue", "Revenues"]
+             if chart_income is not None and not chart_income.empty and key in chart_income.index),
+            None,
+        )
+        operating_key = next(
+            (key for key in ["Operating Income", "Operating Income Loss"]
+             if chart_income is not None and not chart_income.empty and key in chart_income.index),
+            None,
+        )
+        if chart_income is not None and not chart_income.empty and revenue_key:
+            trend_fig = go.Figure()
+            fiscal_cols = list(chart_income.columns)[::-1]
+            fiscal_years = [
+                col.strftime("%Y") if hasattr(col, "strftime") else str(col)[:4]
+                for col in fiscal_cols
+            ]
+            revenue_values = [
+                float(chart_income.loc[revenue_key, col]) / 1e9
+                if pd.notna(chart_income.loc[revenue_key, col]) else None
+                for col in fiscal_cols
+            ]
+            trend_fig.add_trace(go.Scatter(
+                x=fiscal_years, y=revenue_values, name="Revenue",
+                mode="lines+markers", line=dict(color="#60A5FA", width=3),
+                marker=dict(size=7), connectgaps=False,
+                hovertemplate="FY %{x}<br>Revenue: $%{y:.2f}B<extra></extra>",
+            ))
+            if operating_key:
+                operating_values = [
+                    float(chart_income.loc[operating_key, col]) / 1e9
+                    if pd.notna(chart_income.loc[operating_key, col]) else None
+                    for col in fiscal_cols
+                ]
+                trend_fig.add_trace(go.Scatter(
+                    x=fiscal_years, y=operating_values, name="Operating income",
+                    mode="lines+markers", line=dict(color="#34D399", width=2.5),
+                    marker=dict(size=6), connectgaps=False,
+                    hovertemplate="FY %{x}<br>Operating income: $%{y:.2f}B<extra></extra>",
+                ))
+            trend_layout = layout_defaults("", height=330)
+            trend_layout["margin"] = dict(l=18, r=18, t=20, b=28)
+            trend_layout["yaxis"]["tickprefix"] = "$"
+            trend_layout["yaxis"]["ticksuffix"] = "B"
+            trend_layout["legend"] = dict(
+                orientation="h", yanchor="bottom", y=1.02,
+                xanchor="left", x=0, bgcolor="rgba(0,0,0,0)",
+            )
+            trend_fig.update_layout(**trend_layout)
+            st.plotly_chart(
+                trend_fig, use_container_width=True,
+                config={"displayModeBar": False, "displaylogo": False},
+                key=f"landing_financial_trend_{demo['ticker']}",
+            )
+        else:
+            st.info("Annual revenue history is not available for this sample company right now.")
+
+    with chart_right:
+        st.markdown(
+            '<div style="font-size:15px;font-weight:700;margin:0 0 4px">Peer benchmark</div>'
+            '<div style="font-size:11px;color:#8998AD;line-height:1.6;margin-bottom:12px">'
+            'Compare profitability and growth with suggested peers.</div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            '<div style="background:#101C2D;border:1px solid #26384F;border-radius:13px;'
+            'padding:15px 16px;margin-bottom:12px">'
+            '<div style="font-size:10px;color:#93A4BA;margin-bottom:8px">COMPANY IN FOCUS</div>'
+            f'<div style="font-size:19px;font-weight:750;color:#FFFFFF">{demo["name"]}</div>'
+            f'<div style="font-size:12px;color:#93A4BA;margin-top:4px">{demo["ticker"]} · {demo["sector"]}</div>'
+            '<div style="font-size:12px;color:#C4CEDD;line-height:1.6;margin-top:10px">'
+            'Benchmark revenue growth and margins to see where performance stands out.'
+            '</div></div>',
+            unsafe_allow_html=True,
+        )
+        show_peer_chart = st.checkbox(
+            "Load live peer comparison",
+            key=f"landing_load_peers_{demo['ticker']}",
+            help="Loads available financial statements for this company and its suggested peers.",
+        )
+        if show_peer_chart:
+            with st.spinner("Loading peer financials..."):
+                peer_tickers = get_peers(demo["ticker"], info)[:3]
+                peer_rows = []
+                for peer_ticker in [demo["ticker"]] + peer_tickers:
+                    try:
+                        if peer_ticker == demo["ticker"]:
+                            peer_info = info
+                            peer_kpis = kpis
+                        else:
+                            peer_info = get_company_info(peer_ticker)
+                            peer_kpis = calculate_kpis(
+                                get_income_statement(peer_ticker),
+                                get_balance_sheet(peer_ticker),
+                                get_cash_flow(peer_ticker),
+                                peer_info,
+                            )
+                        peer_name = peer_info.get("shortName") or peer_info.get("longName") or peer_ticker
+                        for metric_name in ["Revenue Growth %", "Operating Margin %", "Net Margin %"]:
+                            metric_item = peer_kpis.get(metric_name)
+                            metric_value = metric_item[0] if metric_item else None
+                            if metric_value is not None and pd.notna(metric_value):
+                                peer_rows.append({
+                                    "Company": peer_name,
+                                    "Metric": metric_name.replace(" %", ""),
+                                    "Value": float(metric_value),
+                                })
+                    except Exception:
+                        continue
+            if peer_rows:
+                peer_fig = go.Figure()
+                palette = ["#60A5FA", "#34D399", "#FBBF24", "#A78BFA"]
+                company_labels = list(dict.fromkeys(row["Company"] for row in peer_rows))
+                for index, company_label in enumerate(company_labels):
+                    selected_rows = [row for row in peer_rows if row["Company"] == company_label]
+                    peer_fig.add_trace(go.Bar(
+                        name=company_label,
+                        x=[row["Metric"] for row in selected_rows],
+                        y=[row["Value"] for row in selected_rows],
+                        marker_color=palette[index % len(palette)],
+                        hovertemplate="%{x}: %{y:.1f}%<extra>" + company_label + "</extra>",
+                    ))
+                peer_layout = layout_defaults("", height=330)
+                peer_layout["barmode"] = "group"
+                peer_layout["margin"] = dict(l=12, r=12, t=24, b=36)
+                peer_layout["yaxis"]["ticksuffix"] = "%"
+                peer_layout["legend"] = dict(
+                    orientation="h", yanchor="bottom", y=1.02,
+                    xanchor="left", x=0, bgcolor="rgba(0,0,0,0)",
+                )
+                peer_fig.update_layout(**peer_layout)
+                st.plotly_chart(
+                    peer_fig, use_container_width=True,
+                    config={"displayModeBar": False, "displaylogo": False},
+                    key=f"landing_peer_chart_{demo['ticker']}",
+                )
+                st.caption("Metrics use available reported financials; fiscal periods and business models may differ.")
+            else:
+                st.info("Comparable financial metrics are not available for these peers right now.")
+        else:
+            st.markdown(
+                '<div style="border:1px dashed #35465D;border-radius:10px;padding:13px 14px;'
+                'color:#93A4BA;font-size:12px;line-height:1.6">'
+                'Load an on-demand chart comparing revenue growth, operating margin, and net margin.'
+                '</div>',
+                unsafe_allow_html=True,
+            )
+
+    st.markdown('<div style="height:18px"></div>', unsafe_allow_html=True)
     st.markdown(
         '<p style="font-size:11px;font-weight:700;letter-spacing:1.4px;'
         'color:#8998AD;text-transform:uppercase;margin:0 0 10px">Explore a live analysis</p>',
