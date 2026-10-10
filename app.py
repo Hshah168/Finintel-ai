@@ -4,6 +4,7 @@ import numpy as np
 import yfinance as yf
 import plotly.graph_objects as go
 import io
+import random
 import requests
 from datetime import datetime
 
@@ -99,8 +100,12 @@ st.set_page_config(
     page_title="FinIntel AI",
     page_icon="📊",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
+
+# Persist each visitor's theme choice across Streamlit reruns.
+if "theme_mode" not in st.session_state:
+    st.session_state.theme_mode = "Dark"
 
 # ─── Global CSS ───────────────────────────────────────────────────────────────
 st.markdown("""
@@ -281,6 +286,43 @@ button[kind="header"] {
 ::-webkit-scrollbar-thumb:hover { background: #48484A; }
 </style>
 """, unsafe_allow_html=True)
+
+# ─── Light theme overrides ────────────────────────────────────────────────────
+if st.session_state.get("theme_mode", "Dark") == "Light":
+    st.markdown("""
+    <style>
+    .stApp, [data-testid="stAppViewContainer"] {
+        background:#F5F7FB !important; color:#111827 !important;
+    }
+    [data-testid="stHeader"] { background:rgba(245,247,251,.92) !important; }
+    [data-testid="stSidebar"] {
+        background:#FFFFFF !important; border-right:1px solid #E5E7EB !important;
+    }
+    [data-testid="stSidebar"] .stMarkdown p,
+    [data-testid="stSidebar"] label { color:#4B5563 !important; }
+    [data-testid="stMetric"] {
+        background:#FFFFFF !important; border:1px solid #E5E7EB !important;
+        border-radius:12px !important; padding:14px !important;
+    }
+    [data-testid="stMetricLabel"], [data-testid="stMetricValue"],
+    .stMarkdown, .stMarkdown p { color:#111827; }
+    .stTextInput input, .stTextArea textarea, [data-testid="stChatInput"] textarea {
+        background:#FFFFFF !important; color:#111827 !important;
+        border-color:#D1D5DB !important;
+    }
+    [data-testid="stSelectbox"] > div > div,
+    [data-testid="stRadio"] { color:#111827 !important; }
+    .stApp [data-testid="stMarkdownContainer"] h1 { color:#111827 !important; }
+    .stApp [data-testid="stMarkdownContainer"] p { color:#374151; }
+    .stApp a { color:#1D4ED8; }
+    .stTabs [data-baseweb="tab-list"] {
+        background:#E9EDF4 !important; border-color:#D9E0EA !important;
+    }
+    .stTabs [aria-selected="true"] {
+        background:#FFFFFF !important; color:#111827 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
 # ─── Session state init ────────────────────────────────────────────────────────
 if "ticker" not in st.session_state:
@@ -518,6 +560,32 @@ with st.sidebar:
         Built by Hetal Shah · github.com/Hshah168
     </p>
     """, unsafe_allow_html=True)
+
+# ─── Top-right links and theme control ────────────────────────────────────────
+top_spacer, linkedin_col, github_col, theme_col = st.columns([6.2, 1.15, 1.05, 1.45])
+with linkedin_col:
+    st.markdown(
+        '<div style="text-align:right;padding-top:8px">'
+        '<a href="https://www.linkedin.com/in/shah-hetal/" target="_blank" '
+        'style="color:#8E8E93;text-decoration:none;font-size:12px;font-weight:600">'
+        'LinkedIn ↗</a></div>',
+        unsafe_allow_html=True,
+    )
+with github_col:
+    st.markdown(
+        '<div style="text-align:right;padding-top:8px">'
+        '<a href="https://github.com/Hshah168" target="_blank" '
+        'style="color:#8E8E93;text-decoration:none;font-size:12px;font-weight:600">'
+        'GitHub ↗</a></div>',
+        unsafe_allow_html=True,
+    )
+with theme_col:
+    st.selectbox(
+        "Theme",
+        options=["Dark", "Light"],
+        key="theme_mode",
+        label_visibility="collapsed",
+    )
 
 # ─── Load FMP key for IPO tracker ─────────────────────────────────────────────
 def _load_fmp_key() -> str:
@@ -858,152 +926,180 @@ if app_mode == "Upload Mode":
 
 
 # ─── Landing page (no company selected) ───────────────────────────────────────
-if not st.session_state.ticker:
-    # ── Hero ──────────────────────────────────────────────────────────────────
-    st.markdown("""
-    <div style="text-align:center;padding:60px 20px 32px">
-        <h1 style="font-size:48px;font-weight:800;color:#FFFFFF;margin:0 0 16px;
-                   letter-spacing:-1px">FinIntel AI</h1>
-        <p style="font-size:18px;color:#8E8E93;margin:0 0 0;max-width:520px;
-                   display:inline-block;line-height:1.6">
-            Enterprise-grade financial intelligence for analysts,<br>
-            FP&A teams, and business leaders.
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+DEMO_COMPANIES = [
+    {"ticker": "MSFT", "name": "Microsoft", "sector": "Technology"},
+    {"ticker": "AAPL", "name": "Apple", "sector": "Consumer Technology"},
+    {"ticker": "NVDA", "name": "NVIDIA", "sector": "Semiconductors"},
+    {"ticker": "JPM", "name": "JPMorgan Chase", "sector": "Financial Services"},
+    {"ticker": "WMT", "name": "Walmart", "sector": "Retail"},
+    {"ticker": "XOM", "name": "ExxonMobil", "sector": "Energy"},
+    {"ticker": "LLY", "name": "Eli Lilly", "sector": "Healthcare"},
+    {"ticker": "TM", "name": "Toyota", "sector": "Automotive"},
+    {"ticker": "SHOP", "name": "Shopify", "sector": "Commerce Software"},
+    {"ticker": "CROX", "name": "Crocs", "sector": "Consumer Products"},
+]
 
-    # ── Capability strip ──────────────────────────────────────────────────────
-    for col, (icon, title, sub) in zip(
-        st.columns(4),
-        [("", "Smart Search",     "Type any company name, no ticker needed"),
-         ("", "Variance Analysis", "Automated YoY variance with plain-English narrative"),
-         ("", "Upload Mode",       "Analyze internal financials not in public filings"),
-         ("", "Survival Predictor","24-month distress model from PRA Group methodology")],
+if not st.session_state.ticker:
+    # Pick one real public company per visitor session; financial data is shared
+    # through the existing one-hour Streamlit caches.
+    if "landing_demo_ticker" not in st.session_state:
+        st.session_state.landing_demo_ticker = random.choice(DEMO_COMPANIES)["ticker"]
+    demo = next(
+        (item for item in DEMO_COMPANIES
+         if item["ticker"] == st.session_state.landing_demo_ticker),
+        DEMO_COMPANIES[0],
+    )
+
+    @st.cache_data(ttl=3600, show_spinner=False)
+    def _landing_company_snapshot(ticker: str, company_name: str) -> dict:
+        info = get_company_info(ticker)
+        income = get_income_statement(ticker)
+        balance = get_balance_sheet(ticker)
+        cashflow = get_cash_flow(ticker)
+        kpis = calculate_kpis(income, balance, cashflow, info)
+        score, label, _ = calculate_health_score(kpis, info)
+        brief = generate_cfo_brief(
+            info.get("longName") or info.get("shortName") or company_name,
+            ticker, info, kpis, score, label, [], api_key=None,
+        )
+        summary = ""
+        if "## Executive Summary" in brief:
+            summary = brief.split("## Executive Summary", 1)[1].split("\n## ", 1)[0].strip()
+        return {
+            "info": info, "kpis": kpis, "score": score, "label": label,
+            "summary": summary, "income": income,
+        }
+
+    try:
+        snapshot = _landing_company_snapshot(demo["ticker"], demo["name"])
+    except Exception:
+        snapshot = {"info": {}, "kpis": {}, "score": None, "label": "Unavailable",
+                    "summary": "", "income": pd.DataFrame()}
+
+    info = snapshot.get("info", {})
+    kpis = snapshot.get("kpis", {})
+    score = snapshot.get("score")
+    score_label = snapshot.get("label", "Unavailable")
+    score_color = "#34D399" if isinstance(score, (int, float)) and score >= 70 else (
+        "#FBBF24" if isinstance(score, (int, float)) and score >= 45 else "#F87171"
+    )
+
+    def _demo_kpi(name: str) -> str:
+        item = kpis.get(name)
+        return item[1] if item and len(item) > 1 else "N/A"
+
+    rev_growth = _demo_kpi("Revenue Growth %")
+    gross_margin = _demo_kpi("Gross Margin %")
+    net_margin = _demo_kpi("Net Margin %")
+    fiscal_period = "Latest reported annual financials"
+    try:
+        income_df = snapshot.get("income")
+        if income_df is not None and not income_df.empty:
+            period = income_df.columns[0]
+            fiscal_period = period.strftime("%Y fiscal year") if hasattr(period, "strftime") else str(period)
+    except Exception:
+        pass
+
+    # Two-part product-first landing page: concise positioning + live company snapshot.
+    left, right = st.columns([0.92, 1.08], gap="large")
+    with left:
+        st.markdown(
+            '<div style="padding:42px 8px 18px 0">'
+            '<div style="color:#60A5FA;font-size:11px;font-weight:700;'
+            'letter-spacing:1.7px;text-transform:uppercase;margin-bottom:18px">'
+            'FINANCIAL INTELLIGENCE, IN ACTION</div>'
+            '<h1 style="font-size:48px;line-height:1.04;letter-spacing:-2px;'
+            'font-weight:800;color:var(--landing-heading,#FFFFFF);margin:0 0 26px">'
+            'Know the numbers.<br>Understand the business.</h1>'
+            '<p style="font-size:17px;line-height:1.6;color:var(--landing-copy,#B8C1CF);'
+            'margin:0 0 16px">Financial intelligence that turns company statements into '
+            'clear performance signals, peer context, and executive-ready insights.</p>'
+            '<p style="font-size:15px;line-height:1.6;color:var(--landing-copy,#B8C1CF);'
+            'margin:0 0 16px">Built for FP&amp;A professionals, financial analysts, investors, '
+            'and business leaders who need to understand what is driving performance.</p>'
+            '<p style="font-size:14px;line-height:1.6;color:var(--landing-muted,#8E9AAF);'
+            'margin:0">The 24-month Survival Predictor flags potential financial distress signals '
+            'to help teams investigate risk earlier—not as a guarantee or investment recommendation.</p>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+    with right:
+        st.markdown(
+            f'<div style="background:linear-gradient(145deg,#111C2E,#0D1421);'
+            f'border:1px solid #293A53;border-radius:20px;padding:23px 24px 20px;'
+            f'margin-top:24px;box-shadow:0 18px 50px rgba(0,0,0,.22)">'
+            f'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;'
+            f'margin-bottom:18px">'
+            f'<div><div style="color:#8FA4C1;font-size:10px;font-weight:700;letter-spacing:1.5px;'
+            f'margin-bottom:7px">LIVE COMPANY SNAPSHOT</div>'
+            f'<div style="font-size:23px;font-weight:750;color:#FFFFFF;line-height:1.2">'
+            f'{demo["name"]} <span style="font-size:13px;color:#8FA4C1">({demo["ticker"]})</span></div>'
+            f'<div style="font-size:12px;color:#9CAEC4;margin-top:5px">'
+            f'{info.get("sector") or demo["sector"]} · {fiscal_period}</div></div>'
+            f'<div style="background:#102D2A;border:1px solid #1D5C4D;border-radius:999px;'
+            f'padding:6px 10px;color:#6EE7B7;font-size:10px;font-weight:700;white-space:nowrap">'
+            f'PUBLIC FILINGS</div></div>'
+            f'<div style="background:#131F30;border:1px solid #283A52;border-radius:14px;'
+            f'padding:17px;margin-bottom:12px;display:flex;align-items:center;gap:18px">'
+            f'<div style="flex:1"><div style="color:#93A4BA;font-size:11px;margin-bottom:5px">'
+            f'Financial Health Score</div><div style="color:{score_color};font-size:38px;'
+            f'font-weight:800;line-height:1.1">{score if score is not None else "N/A"}'
+            f'<span style="font-size:13px;color:#91A1B7;font-weight:500"> / 100</span></div>'
+            f'<div style="color:{score_color};font-size:12px;font-weight:600;margin-top:5px">'
+            f'{score_label}</div></div>'
+            f'<div style="width:1px;height:62px;background:#2A3A50"></div>'
+            f'<div style="flex:1"><div style="color:#93A4BA;font-size:11px;margin-bottom:7px">'
+            f'Revenue growth</div><div style="color:#FFFFFF;font-size:25px;font-weight:750">'
+            f'{rev_growth}</div><div style="color:#7F91A8;font-size:10px;margin-top:4px">'
+            f'Year over year</div></div></div>'
+            f'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:15px">'
+            f'<div style="background:#131F30;border:1px solid #283A52;border-radius:12px;padding:13px">'
+            f'<div style="font-size:10px;color:#93A4BA;margin-bottom:7px">GROSS MARGIN</div>'
+            f'<div style="font-size:23px;color:#FFFFFF;font-weight:750">{gross_margin}</div></div>'
+            f'<div style="background:#131F30;border:1px solid #283A52;border-radius:12px;padding:13px">'
+            f'<div style="font-size:10px;color:#93A4BA;margin-bottom:7px">NET MARGIN</div>'
+            f'<div style="font-size:23px;color:#FFFFFF;font-weight:750">{net_margin}</div></div></div>'
+            f'<div style="border-top:1px solid #293A53;padding-top:14px">'
+            f'<div style="font-size:10px;color:#60A5FA;font-weight:700;letter-spacing:1.3px;'
+            f'margin-bottom:7px">CFO BRIEF · FINANCIAL SIGNAL</div>'
+            f'<p style="font-size:12px;line-height:1.65;color:#C4CEDD;margin:0">'
+            f'{snapshot.get("summary") or "Financial data is loading or not available for this company. '
+            f'Choose a company below to open its full analysis."}</p></div>'
+            f'<div style="font-size:10px;color:#75869D;margin-top:13px">'
+            f'Source: Yahoo Finance · {fiscal_period} · Cached for faster repeat visits</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+
+    st.markdown('<div style="height:12px"></div>', unsafe_allow_html=True)
+    st.markdown(
+        '<p style="font-size:11px;font-weight:700;letter-spacing:1.4px;'
+        'color:#8998AD;text-transform:uppercase;margin:0 0 10px">Explore a live analysis</p>',
+        unsafe_allow_html=True,
+    )
+    try_cols = st.columns(3, gap="small")
+    for col, (try_ticker, try_name) in zip(
+        try_cols, [("MSFT", "Microsoft"), ("AAPL", "Apple"), ("NVDA", "NVIDIA")]
     ):
         with col:
-            st.markdown(f"""
-            <div style="background:#1C1C1E;border:1px solid #2C2C2E;border-radius:10px;
-                        padding:14px 16px;">
-                <span style="font-size:20px">{icon}</span>
-                <p style="color:#FFFFFF;font-size:13px;font-weight:600;margin:8px 0 2px">{title}</p>
-                <p style="color:#8E8E93;font-size:11px;margin:0">{sub}</p>
-            </div>
-            """, unsafe_allow_html=True)
+            if st.button(f"Try {try_name}  ↗", key=f"landing_try_{try_ticker}",
+                         use_container_width=True):
+                st.session_state.ticker = try_ticker
+                st.session_state.company_name = try_name
+                st.session_state.chat_history = []
+                st.session_state.cfo_brief = None
+                st.session_state.upload_statements = None
+                st.session_state.upload_company_name = None
+                st.session_state.upload_peer = ""
+                st.rerun()
 
-    st.markdown('<div style="height:32px"></div>', unsafe_allow_html=True)
-
-    # ── How to get started ────────────────────────────────────────────────────
-    st.markdown("""
-    <div style="background:linear-gradient(135deg,#111827 0%,#101522 100%);
-                border:1px solid #29354A;border-radius:16px;padding:24px 26px;
-                margin-bottom:24px;box-shadow:0 8px 28px rgba(0,0,0,0.16)">
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;
-                    gap:16px;flex-wrap:wrap;margin-bottom:22px">
-            <div>
-                <p style="color:#60A5FA;font-size:11px;font-weight:700;margin:0 0 7px;
-                          text-transform:uppercase;letter-spacing:1.3px">
-                    YOUR FIRST ANALYSIS
-                </p>
-                <p style="color:#FFFFFF;font-size:22px;font-weight:700;line-height:1.25;
-                          margin:0 0 7px">
-                    From financial data to a clearer business picture.
-                </p>
-                <p style="color:#A7B2C4;font-size:13px;line-height:1.6;margin:0;max-width:650px">
-                    Choose a public company or bring your own financials. FinIntel AI organizes
-                    the numbers into key metrics, business signals, and decision-ready insights.
-                </p>
-            </div>
-            <div style="background:#17243A;border:1px solid #30415C;border-radius:10px;
-                        padding:9px 12px;color:#BFDBFE;font-size:11px;font-weight:600;
-                        white-space:nowrap">
-                3 simple steps
-            </div>
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
-                    gap:12px">
-            <div style="background:#171E2B;border:1px solid #2B3547;border-radius:12px;
-                        padding:16px 15px;min-width:0">
-                <div style="display:flex;align-items:center;gap:10px;margin-bottom:11px">
-                    <span style="display:flex;align-items:center;justify-content:center;
-                                 width:29px;height:29px;border-radius:8px;background:#1D3554;
-                                 color:#93C5FD;font-size:13px;font-weight:700;flex-shrink:0">01</span>
-                    <span style="color:#FFFFFF;font-size:14px;font-weight:650">Choose your data</span>
-                </div>
-                <p style="color:#C5CEDB;font-size:12px;line-height:1.65;margin:0">
-                    <b style="color:#FFFFFF">Public company?</b> Use Search Mode or Quick Access
-                    in the sidebar to load a company.
-                    <br><br>
-                    <b style="color:#FFFFFF">Your own financials?</b> Switch to Upload Mode.
-                </p>
-            </div>
-            <div style="background:#171E2B;border:1px solid #2B3547;border-radius:12px;
-                        padding:16px 15px;min-width:0">
-                <div style="display:flex;align-items:center;gap:10px;margin-bottom:11px">
-                    <span style="display:flex;align-items:center;justify-content:center;
-                                 width:29px;height:29px;border-radius:8px;background:#1D3554;
-                                 color:#93C5FD;font-size:13px;font-weight:700;flex-shrink:0">02</span>
-                    <span style="color:#FFFFFF;font-size:14px;font-weight:650">Review the signals</span>
-                </div>
-                <p style="color:#C5CEDB;font-size:12px;line-height:1.65;margin:0">
-                    Explore financial statements, 11 KPIs, the 0–100 Health Score, year-over-year
-                    changes, and peer comparisons where available.
-                </p>
-            </div>
-            <div style="background:#171E2B;border:1px solid #2B3547;border-radius:12px;
-                        padding:16px 15px;min-width:0">
-                <div style="display:flex;align-items:center;gap:10px;margin-bottom:11px">
-                    <span style="display:flex;align-items:center;justify-content:center;
-                                 width:29px;height:29px;border-radius:8px;background:#1D3554;
-                                 color:#93C5FD;font-size:13px;font-weight:700;flex-shrink:0">03</span>
-                    <span style="color:#FFFFFF;font-size:14px;font-weight:650">Turn insight into action</span>
-                </div>
-                <p style="color:#C5CEDB;font-size:12px;line-height:1.65;margin:0">
-                    Generate a CFO Brief, explore the AI Copilot for follow-up questions, and
-                    export a report when you need a shareable summary.
-                </p>
-            </div>
-        </div>
-        <p style="color:#8794A8;font-size:11px;line-height:1.5;margin:15px 0 0">
-            Tip: Start with a company you know, then compare its performance with a competitor.
-            Available metrics and history can vary by company and data source.
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # ── Live IPO filing discovery — placed after the first-analysis guide ─────
-    render_ipo_tracker(compact=True)
-    st.markdown('<div style="height:32px"></div>', unsafe_allow_html=True)
-
-    # ── What you get strip ────────────────────────────────────────────────────
-    st.markdown('<p style="color:#8E8E93;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;margin:0 0 12px">What you get for every company</p>', unsafe_allow_html=True)
-    features = [
-        ("11 KPIs",            "Calculated automatically from live financial statements"),
-        ("Health Score",       "0-100 score across profitability, growth, liquidity, leverage, cash flow"),
-        ("Variance Analysis",  "YoY change with plain-English narrative for every major line item"),
-        ("CFO Brief",          "One-click structured brief — download as PDF or PowerPoint"),
-        ("Segment Breakdown",  "Revenue by business division for major companies"),
-        ("Survival Predictor", "24-month probabilistic distress model"),
-        ("Upload Mode",        "Same analysis on your own private financials"),
-        ("Peer Benchmark",     "Side-by-side comparison against any public competitor"),
-    ]
-    r1, r2 = st.columns(2)
-    for i, (title, desc) in enumerate(features):
-        with (r1 if i % 2 == 0 else r2):
-            st.markdown(f"""
-            <div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid #1C1C1E">
-                <span style="color:#0A84FF;font-size:14px;margin-top:1px">✓</span>
-                <div>
-                    <span style="color:#FFFFFF;font-size:13px;font-weight:600">{title}</span>
-                    <span style="color:#8E8E93;font-size:12px;margin-left:6px">{desc}</span>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
-    st.markdown("""
-    <p style="color:#48484A;font-size:11px;margin-top:20px;text-align:center">
-        Data via Yahoo Finance · Not financial advice · Built by Hetal Shah · github.com/Hshah168
-    </p>
-    """, unsafe_allow_html=True)
+    st.markdown(
+        '<p style="font-size:10px;color:#66758A;text-align:center;margin:24px 0 8px">'
+        'Demo company rotates across 10 public companies and industries for new visits. '
+        'Metrics reflect reported data available from the source and may not cover every fiscal period. '
+        'For research purposes only; not financial advice.</p>',
+        unsafe_allow_html=True,
+    )
     st.stop()
 
 
