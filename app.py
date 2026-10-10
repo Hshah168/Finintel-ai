@@ -970,6 +970,18 @@ if not st.session_state.ticker:
             "summary": summary, "income": income,
         }
 
+    # Warm the three featured demo companies into Streamlit's shared cache so
+    # selecting one usually reuses the financial statements and company profile.
+    if "featured_demo_cache_warmed" not in st.session_state:
+        for featured_ticker, featured_name in [
+            ("MSFT", "Microsoft"), ("AAPL", "Apple"), ("NVDA", "NVIDIA")
+        ]:
+            try:
+                _landing_company_snapshot(featured_ticker, featured_name)
+            except Exception:
+                pass
+        st.session_state.featured_demo_cache_warmed = True
+
     try:
         snapshot = _landing_company_snapshot(demo["ticker"], demo["name"])
     except Exception:
