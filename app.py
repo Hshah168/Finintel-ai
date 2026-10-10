@@ -1075,8 +1075,7 @@ if not st.session_state.ticker:
             f'<div style="font-size:10px;color:#60A5FA;font-weight:700;letter-spacing:1.3px;'
             f'margin-bottom:7px">CFO BRIEF · FINANCIAL SIGNAL</div>'
             f'<p style="font-size:12px;line-height:1.65;color:#C4CEDD;margin:0">'
-            f'{snapshot.get("summary") or "Financial data is loading or not available for this company. '
-            f'Choose a company below to open its full analysis."}</p></div>'
+            f'{snapshot.get("summary") or "Financial data is loading or not available for this company. Choose a company below to open its full analysis."}</p></div>'
             f'<div style="font-size:10px;color:#75869D;margin-top:13px">'
             f'Source: Yahoo Finance · {fiscal_period} · Cached for faster repeat visits</div>'
             f'</div>',
