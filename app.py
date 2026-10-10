@@ -630,7 +630,7 @@ st.markdown(
     .finintel-header-social {
         position: fixed;
         top: 0.48rem;
-        right: 6.9rem;
+        right: 9.4rem;
         z-index: 1000020;
         display: flex;
         align-items: center;
@@ -655,7 +655,7 @@ st.markdown(
     }
     .finintel-header-social .finintel-linkedin { color: #0A66C2; }
     @media (max-width: 640px) {
-        .finintel-header-social { right: 5.6rem; top: .5rem; gap: 4px; }
+        .finintel-header-social { right: 7.6rem; top: .5rem; gap: 4px; }
         .finintel-header-social a { width: 28px; height: 28px; }
     }
     </style>
