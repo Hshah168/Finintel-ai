@@ -118,7 +118,7 @@ html, body, [class*="css"] {
     font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
 }
 
-/* Hide Streamlit default elements — keep header visible for sidebar toggle */
+/* Hide Streamlit default elements - keep header visible for sidebar toggle */
 #MainMenu { visibility: hidden; }
 footer { visibility: hidden; }
 .stDeployButton { display: none; }
@@ -317,33 +317,34 @@ if st.session_state.get("theme_mode", "Dark") == "Light":
     .stApp a { color:#1D4ED8 !important; }
 
     /* Force readable dark text across Streamlit widgets and custom components. */
-    .stApp, .stApp p, .stApp span, .stApp label, .stApp li,
-    .stApp div[data-testid="stMarkdownContainer"],
-    .stApp div[data-testid="stMarkdownContainer"] *,
-    .stApp [data-testid="stCaptionContainer"],
-    .stApp [data-testid="stCaptionContainer"] *,
-    .stApp [data-testid="stWidgetLabel"],
-    .stApp [data-testid="stWidgetLabel"] *,
-    .stApp [data-testid="stMetricLabel"],
-    .stApp [data-testid="stMetricValue"],
-    .stApp [data-testid="stMetricDelta"],
-    .stApp [data-testid="stExpander"] summary,
-    .stApp [data-testid="stExpander"] summary *,
-    .stApp [data-testid="stDataFrame"],
-    .stApp [data-testid="stTable"],
-    .stApp [data-testid="stAlert"] *,
-    .stApp [data-testid="stRadio"] *,
-    .stApp [data-testid="stCheckbox"] *,
-    .stApp [data-testid="stSelectbox"] *,
-    .stApp [data-testid="stMultiSelect"] *,
-    .stApp [data-testid="stNumberInput"] *,
-    .stApp [data-testid="stDateInput"] *,
-    .stApp [data-testid="stFileUploader"] *,
-    .stApp [data-testid="stTabs"] button,
-    .stApp [data-testid="stTabs"] button *,
-    .stApp [data-testid="stSidebar"] *,
-    .stApp [data-testid="stHeader"] *,
-    .stApp [data-testid="stToolbar"] * {
+    .stApp, .stApp p:not(.finintel-demo-panel *), .stApp span:not(.finintel-demo-panel *),
+    .stApp label:not(.finintel-demo-panel *), .stApp li:not(.finintel-demo-panel *),
+    .stApp div[data-testid="stMarkdownContainer"]:not(.finintel-demo-panel),
+    .stApp div[data-testid="stMarkdownContainer"] *:not(.finintel-demo-panel *),
+    .stApp [data-testid="stCaptionContainer"]:not(.finintel-demo-panel),
+    .stApp [data-testid="stCaptionContainer"] *:not(.finintel-demo-panel *),
+    .stApp [data-testid="stWidgetLabel"]:not(.finintel-demo-panel),
+    .stApp [data-testid="stWidgetLabel"] *:not(.finintel-demo-panel *),
+    .stApp [data-testid="stMetricLabel"]:not(.finintel-demo-panel *),
+    .stApp [data-testid="stMetricValue"]:not(.finintel-demo-panel *),
+    .stApp [data-testid="stMetricDelta"]:not(.finintel-demo-panel *),
+    .stApp [data-testid="stExpander"] summary:not(.finintel-demo-panel *),
+    .stApp [data-testid="stExpander"] summary *:not(.finintel-demo-panel *),
+    .stApp [data-testid="stDataFrame"]:not(.finintel-demo-panel *),
+    .stApp [data-testid="stTable"]:not(.finintel-demo-panel *),
+    .stApp [data-testid="stAlert"] *:not(.finintel-demo-panel *),
+    .stApp [data-testid="stRadio"] *:not(.finintel-demo-panel *),
+    .stApp [data-testid="stCheckbox"] *:not(.finintel-demo-panel *),
+    .stApp [data-testid="stSelectbox"] *:not(.finintel-demo-panel *),
+    .stApp [data-testid="stMultiSelect"] *:not(.finintel-demo-panel *),
+    .stApp [data-testid="stNumberInput"] *:not(.finintel-demo-panel *),
+    .stApp [data-testid="stDateInput"] *:not(.finintel-demo-panel *),
+    .stApp [data-testid="stFileUploader"] *:not(.finintel-demo-panel *),
+    .stApp [data-testid="stTabs"] button:not(.finintel-demo-panel *),
+    .stApp [data-testid="stTabs"] button *:not(.finintel-demo-panel *),
+    .stApp [data-testid="stSidebar"] *:not(.finintel-demo-panel *),
+    .stApp [data-testid="stHeader"] *:not(.finintel-demo-panel *),
+    .stApp [data-testid="stToolbar"] *:not(.finintel-demo-panel *) {
         color:#111827 !important;
     }
     .stApp [data-testid="stMetric"] {
@@ -398,12 +399,19 @@ if "recent_companies" not in st.session_state:
 # ─── Sidebar ──────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("""
-    <div style="padding: 8px 0 16px 0">
-        <p style="font-size:22px;font-weight:800;color:#FFFFFF;margin:0;letter-spacing:-0.5px">
-            FinIntel AI
-        </p>
-        <p style="font-size:12px;color:#8E8E93;margin:4px 0 0 0;font-weight:500">
-            Financial Intelligence Platform
+    <div style="padding:12px 0 19px 0;border-bottom:1px solid #64748B33;margin-bottom:18px">
+        <div style="display:flex;align-items:center;gap:10px">
+            <div style="width:38px;height:38px;display:flex;align-items:center;justify-content:center;
+                        border-radius:11px;background:linear-gradient(135deg,#2563EB,#0F766E);
+                        box-shadow:0 5px 14px #2563EB33;color:#FFFFFF;font-size:19px;font-weight:800">
+                F
+            </div>
+            <div style="font-size:27px;line-height:1.05;font-weight:850;color:#FFFFFF;
+                        letter-spacing:-0.9px">FinIntel AI</div>
+        </div>
+        <p style="font-size:11px;color:#8E9AAF;margin:8px 0 0 48px;font-weight:600;
+                  letter-spacing:0.35px;text-transform:uppercase">
+            Financial Intelligence
         </p>
     </div>
     """, unsafe_allow_html=True)
@@ -605,28 +613,38 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown("""
-    <p style="color:#48484A;font-size:10px;text-align:center">
-        Data via Yahoo Finance · Not financial advice<br>
+    <div style="color:#6B7280;font-size:10px;line-height:1.65;text-align:center;
+                padding:10px 4px 4px;border-top:1px solid #64748B33">
+        Data via Yahoo Finance<br>
+        For research purposes only; not financial advice.<br>
         Built by Hetal Shah · github.com/Hshah168
-    </p>
+    </div>
     """, unsafe_allow_html=True)
 
 # ─── Top-right links and theme control ────────────────────────────────────────
 top_spacer, linkedin_col, github_col, theme_col = st.columns([6.2, 1.15, 1.05, 1.45])
 with linkedin_col:
     st.markdown(
-        '<div style="text-align:right;padding-top:8px">'
-        '<a href="https://www.linkedin.com/in/shah-hetal/" target="_blank" '
-        'style="color:#8E8E93;text-decoration:none;font-size:12px;font-weight:600">'
-        'LinkedIn ↗</a></div>',
+        '<div style="display:flex;justify-content:flex-end;padding-top:5px">'
+        '<a aria-label="LinkedIn profile" title="LinkedIn profile" '
+        'href="https://www.linkedin.com/in/shah-hetal/" target="_blank" rel="noopener noreferrer" '
+        'style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;'
+        'border:1px solid #64748B55;border-radius:10px;color:#0A66C2;text-decoration:none">'
+        '<svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" '
+        'fill="currentColor" aria-hidden="true"><path d="M19 3A2 2 0 0 1 21 5V19A2 2 0 0 1 19 21H5A2 2 0 0 1 3 19V5A2 2 0 0 1 5 3H19ZM8.34 17.34V10H5.67V17.34H8.34ZM7 8.99A1.55 1.55 0 1 0 7 5.89A1.55 1.55 0 0 0 7 8.99ZM18.34 17.34V13.32C18.34 11.17 17.19 10.17 15.66 10.17C14.42 10.17 13.86 10.85 13.55 11.33V10H10.88V17.34H13.55V13.75C13.55 12.8 13.73 11.88 14.91 11.88C16.08 11.88 16.1 12.97 16.1 13.81V17.34H18.34Z"/></svg>'
+        '</a></div>',
         unsafe_allow_html=True,
     )
 with github_col:
     st.markdown(
-        '<div style="text-align:right;padding-top:8px">'
-        '<a href="https://github.com/Hshah168" target="_blank" '
-        'style="color:#8E8E93;text-decoration:none;font-size:12px;font-weight:600">'
-        'GitHub ↗</a></div>',
+        '<div style="display:flex;justify-content:flex-end;padding-top:5px">'
+        '<a aria-label="GitHub profile" title="GitHub profile" '
+        'href="https://github.com/Hshah168" target="_blank" rel="noopener noreferrer" '
+        'style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;'
+        'border:1px solid #64748B55;border-radius:10px;color:#111827;text-decoration:none">'
+        '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" '
+        'fill="currentColor" aria-hidden="true"><path d="M12 .9A11.1 11.1 0 0 0 8.49 22.53c.55.1.76-.24.76-.53v-2.08c-3.1.68-3.76-1.32-3.76-1.32-.5-1.29-1.24-1.63-1.24-1.63-1.02-.7.08-.69.08-.69 1.13.08 1.73 1.16 1.73 1.16 1 1.72 2.63 1.22 3.27.93.1-.72.39-1.22.71-1.5-2.48-.28-5.09-1.24-5.09-5.53 0-1.22.44-2.22 1.16-3-.12-.28-.5-1.42.11-2.96 0 0 .95-.3 3.05 1.15a10.6 10.6 0 0 1 5.55 0c2.1-1.45 3.05-1.15 3.05-1.15.61 1.54.23 2.68.11 2.96.72.78 1.16 1.78 1.16 3 0 4.3-2.61 5.25-5.1 5.52.4.35.75 1.03.75 2.08V22c0 .29.2.63.76.52A11.1 11.1 0 0 0 12 .9Z"/></svg>'
+        '</a></div>',
         unsafe_allow_html=True,
     )
 with theme_col:
@@ -816,7 +834,7 @@ if app_mode == "Upload Mode":
                             if abs(v) >= 1e6: return f"${v/1e6:,.1f}M"
                             if abs(v) >= 1e3: return f"${v/1e3:,.0f}K"
                             return f"${v:,.0f}"
-                        except: return "—"
+                        except: return "-"
                     try:
                         display_df = df.map(fmt_u)
                     except AttributeError:
@@ -1081,13 +1099,13 @@ if not st.session_state.ticker:
             'and business leaders who need to understand what is driving performance.</p>'
             '<p style="font-size:14px;line-height:1.6;color:var(--landing-muted,#8E9AAF);'
             'margin:0">The 24-month Survival Predictor flags potential financial distress signals '
-            'to help teams investigate risk earlier—not as a guarantee or investment recommendation.</p>'
+            'to help teams investigate risk earlier-not as a guarantee or investment recommendation.</p>'
             '</div>',
             unsafe_allow_html=True,
         )
     with right:
         st.markdown(
-            f'<div style="background:linear-gradient(145deg,#111C2E,#0D1421);'
+            f'<div class="finintel-demo-panel" style="background:linear-gradient(145deg,#111C2E,#0D1421);'
             f'border:1px solid #293A53;border-radius:20px;padding:23px 24px 20px;'
             f'margin-top:24px;box-shadow:0 18px 50px rgba(0,0,0,.22)">'
             f'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;'
@@ -1154,13 +1172,7 @@ if not st.session_state.ticker:
                 st.session_state.upload_peer = ""
                 st.rerun()
 
-    st.markdown(
-        '<p style="font-size:10px;color:#66758A;text-align:center;margin:24px 0 8px">'
-        'Demo company rotates across 10 public companies and industries for new visits. '
-        'Metrics reflect reported data available from the source and may not cover every fiscal period. '
-        'For research purposes only; not financial advice.</p>',
-        unsafe_allow_html=True,
-    )
+
 
     # IPO discovery is intentionally placed at the bottom, after the product-first
     # landing experience and company demo.
@@ -1815,13 +1827,13 @@ with tabs[6]:
 # TAB 8: SURVIVAL PREDICTOR
 # ══════════════════════════════════════════════════════════════════════════════
 with tabs[7]:
-    st.markdown("**Startup Financial Survival Predictor — Will This Company Survive the Next 24 Months?**")
+    st.markdown("**Startup Financial Survival Predictor - Will This Company Survive the Next 24 Months?**")
     st.markdown("""
     <div style="background:#BF5AF211;border:1px solid #BF5AF233;border-radius:10px;
                 padding:12px 16px;margin-bottom:20px">
         <p style="color:#BF5AF2;font-size:12px;font-weight:600;margin:0 0 4px">Methodology</p>
         <p style="color:#8E8E93;font-size:12px;margin:0;line-height:1.6">
-            Built on distress pattern recognition from PRA Group debt portfolio analysis — identifying
+            Built on distress pattern recognition from PRA Group debt portfolio analysis - identifying
             the financial fingerprint of companies 12-18 months before they fail. Combined with a
             Modified Altman Z-Score recalibrated for high-growth tech companies, cash runway modeling,
             revenue momentum decay analysis, and leverage risk scoring.
@@ -1965,9 +1977,9 @@ with tabs[7]:
     # ── Scenario narratives ───────────────────────────────────────────────────
     st.markdown("**Detailed Scenario Analysis**")
     for s_label, s_text, s_color in [
-        ("Scenario A — Thriving", sv.scenario_a_text, COLORS["success"]),
-        ("Scenario B — Vulnerable", sv.scenario_b_text, COLORS["warning"]),
-        ("Scenario C — Critical", sv.scenario_c_text, COLORS["danger"]),
+        ("Scenario A - Thriving", sv.scenario_a_text, COLORS["success"]),
+        ("Scenario B - Vulnerable", sv.scenario_b_text, COLORS["warning"]),
+        ("Scenario C - Critical", sv.scenario_c_text, COLORS["danger"]),
     ]:
         st.markdown(f"""
         <div style="background:#1C1C1E;border-left:3px solid {s_color};border-radius:0 10px 10px 0;
@@ -2004,9 +2016,9 @@ with tabs[8]:
     <div style="background:#1C1C1E;border:1px solid #2C2C2E;border-radius:12px;padding:20px;margin-bottom:20px">
         <p style="color:#FFFFFF;font-size:14px;font-weight:600;margin:0 0 8px">Supported Formats</p>
         <p style="color:#8E8E93;font-size:13px;margin:0;line-height:1.8">
-            <b style="color:#34C759">Excel (.xlsx)</b> — Name sheets: "Income Statement", "Balance Sheet", "Cash Flow"<br>
-            <b style="color:#34C759">CSV (.csv)</b> — Single statement, first column as row labels, year columns as headers<br>
-            <b style="color:#34C759">PDF (.pdf)</b> — Text-based annual reports with financial tables
+            <b style="color:#34C759">Excel (.xlsx)</b> - Name sheets: "Income Statement", "Balance Sheet", "Cash Flow"<br>
+            <b style="color:#34C759">CSV (.csv)</b> - Single statement, first column as row labels, year columns as headers<br>
+            <b style="color:#34C759">PDF (.pdf)</b> - Text-based annual reports with financial tables
         </p>
     </div>
     """, unsafe_allow_html=True)
@@ -2027,7 +2039,7 @@ with tabs[8]:
             <p style="color:#8E8E93;font-size:12px;margin:0;line-height:1.6">
                 First column: line item names (Revenue, Net Income, etc.)<br>
                 Column headers: fiscal years (2022, 2023, 2024)<br>
-                Values: actual units or millions — app auto-detects scale<br>
+                Values: actual units or millions - app auto-detects scale<br>
                 Negatives: use minus sign or parentheses like (1,234)
             </p>
         </div>
@@ -2107,7 +2119,7 @@ with tabs[8]:
                                     if abs(v) >= 1e9: return f"${v/1e9:,.2f}B"
                                     if abs(v) >= 1e6: return f"${v/1e6:,.1f}M"
                                     return f"${v:,.0f}"
-                                except: return "—"
+                                except: return "-"
                             try:
                                 display_df = df.map(fmt_priv)
                             except AttributeError:
