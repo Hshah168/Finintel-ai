@@ -434,92 +434,97 @@ app_mode = st.radio(
 st.markdown('<div style="height:5px"></div>', unsafe_allow_html=True)
 
 if app_mode == "Company Research":
-    st.markdown('<div class="finintel-workspace-label">Research any public company</div>', unsafe_allow_html=True)
-    search_col, search_btn_col = st.columns([5, 1.1], gap="small")
-    with search_col:
-        search_input = st.text_input(
-            "Company name or ticker",
-            placeholder="Search a company or enter a ticker — e.g. Microsoft, AAPL, TCS…",
-            label_visibility="collapsed",
-            key="main_company_search",
-        )
-    with search_btn_col:
-        search_btn = st.button("Analyze company", type="primary", use_container_width=True, key="main_analyze_company")
+    if st.session_state.ticker:
+            st.markdown('<div class="finintel-workspace-label">Research any public company</div>', unsafe_allow_html=True)
+            search_col, search_btn_col = st.columns([5, 1.1], gap="small")
+            with search_col:
+                search_input = st.text_input(
+                    "Company name or ticker",
+                    placeholder="Search a company or enter a ticker — e.g. Microsoft, AAPL, TCS…",
+                    label_visibility="collapsed",
+                    key="main_company_search",
+                )
+            with search_btn_col:
+                search_btn = st.button("Analyze company", type="primary", use_container_width=True, key="main_analyze_company")
 
-    quick_companies = [
-        ("MSFT", "Microsoft", "Mega-cap · Technology"),
-        ("WMT", "Walmart", "Mega-cap · Retail"),
-        ("JPM", "JPMorgan", "Large-cap · Banking"),
-        ("XOM", "ExxonMobil", "Large-cap · Energy"),
-        ("LLY", "Eli Lilly", "Large-cap · Healthcare"),
-        ("TM", "Toyota", "Large-cap · Automotive"),
-        ("DE", "Deere", "Large-cap · Industrials"),
-        ("SONY", "Sony", "Large-cap · Entertainment"),
-        ("SHOP", "Shopify", "Mid-cap · Commerce"),
-        ("CROX", "Crocs", "Mid-cap · Consumer"),
-        ("DUOL", "Duolingo", "Mid-cap · Education tech"),
-        ("SOFI", "SoFi", "Mid-cap · Fintech"),
-        ("ELF", "e.l.f. Beauty", "Mid-cap · Beauty"),
-        ("RKLB", "Rocket Lab", "Smaller-cap · Aerospace"),
-        ("HIMS", "Hims & Hers", "Smaller-cap · Digital health"),
-        ("CAVA", "CAVA", "Smaller-cap · Restaurants"),
-    ]
-    st.markdown('<div style="font-size:11px;color:#8E9AAF;font-weight:650;margin:5px 0 7px">QUICK LOOKUP · A MIX OF INDUSTRIES & COMPANY SIZES</div>', unsafe_allow_html=True)
-    quick_cols = st.columns(8, gap="small")
-    for i, (ticker, company_label, company_category) in enumerate(quick_companies):
-        with quick_cols[i]:
-            if st.button(company_label, key=f"quick_{ticker}", use_container_width=True, help=company_category):
-                st.session_state.ticker = ticker
-                st.session_state.company_name = company_label
-                st.session_state.chat_history = []
-                st.session_state.cfo_brief = None
-                st.session_state.upload_statements = None
-                st.session_state.upload_company_name = None
-                st.session_state.upload_peer = ""
-
-    public_companies = fetch_public_company_directory()
-    if public_companies:
-        directory_col, directory_button_col = st.columns([5, 1.1], gap="small")
-        company_options = {
-            f"{item['name']} ({item['ticker']})": item
-            for item in public_companies
-        }
-        with directory_col:
-            selected_company = st.selectbox(
-                "Browse all listed companies",
-                options=list(company_options.keys()),
-                index=None,
-                placeholder="Or browse the public-company directory…",
-                label_visibility="collapsed",
-                key="public_company_directory",
-            )
-        with directory_button_col:
-            st.markdown('<div style="height:1px"></div>', unsafe_allow_html=True)
-            analyze_selected = st.button(
-                "Open selected", key="analyze_public_company",
-                use_container_width=True, disabled=not selected_company,
-            )
-        if selected_company and analyze_selected:
-            selected = company_options[selected_company]
-            st.session_state.ticker = selected["ticker"]
-            st.session_state.company_name = selected["name"]
-            st.session_state.chat_history = []
-            st.session_state.cfo_brief = None
-            st.session_state.upload_statements = None
-            st.session_state.upload_company_name = None
-            st.session_state.upload_peer = ""
-
-    if st.session_state.recent_companies:
-        with st.expander("Recently analyzed", expanded=False):
-            recent_cols = st.columns(min(5, len(st.session_state.recent_companies)), gap="small")
-            for i, (recent_ticker, recent_name) in enumerate(st.session_state.recent_companies[:5]):
-                with recent_cols[i]:
-                    if st.button(recent_name, key=f"recent_{recent_ticker}", use_container_width=True):
-                        st.session_state.ticker = recent_ticker
-                        st.session_state.company_name = recent_name
+            quick_companies = [
+                ("MSFT", "Microsoft", "Mega-cap · Technology"),
+                ("WMT", "Walmart", "Mega-cap · Retail"),
+                ("JPM", "JPMorgan", "Large-cap · Banking"),
+                ("XOM", "ExxonMobil", "Large-cap · Energy"),
+                ("LLY", "Eli Lilly", "Large-cap · Healthcare"),
+                ("TM", "Toyota", "Large-cap · Automotive"),
+                ("DE", "Deere", "Large-cap · Industrials"),
+                ("SONY", "Sony", "Large-cap · Entertainment"),
+                ("SHOP", "Shopify", "Mid-cap · Commerce"),
+                ("CROX", "Crocs", "Mid-cap · Consumer"),
+                ("DUOL", "Duolingo", "Mid-cap · Education tech"),
+                ("SOFI", "SoFi", "Mid-cap · Fintech"),
+                ("ELF", "e.l.f. Beauty", "Mid-cap · Beauty"),
+                ("RKLB", "Rocket Lab", "Smaller-cap · Aerospace"),
+                ("HIMS", "Hims & Hers", "Smaller-cap · Digital health"),
+                ("CAVA", "CAVA", "Smaller-cap · Restaurants"),
+            ]
+            st.markdown('<div style="font-size:11px;color:#8E9AAF;font-weight:650;margin:5px 0 7px">QUICK LOOKUP · A MIX OF INDUSTRIES & COMPANY SIZES</div>', unsafe_allow_html=True)
+            quick_cols = st.columns(8, gap="small")
+            for i, (ticker, company_label, company_category) in enumerate(quick_companies):
+                with quick_cols[i]:
+                    if st.button(company_label, key=f"quick_{ticker}", use_container_width=True, help=company_category):
+                        st.session_state.ticker = ticker
+                        st.session_state.company_name = company_label
                         st.session_state.chat_history = []
                         st.session_state.cfo_brief = None
-                        st.rerun()
+                        st.session_state.upload_statements = None
+                        st.session_state.upload_company_name = None
+                        st.session_state.upload_peer = ""
+
+            public_companies = fetch_public_company_directory()
+            if public_companies:
+                directory_col, directory_button_col = st.columns([5, 1.1], gap="small")
+                company_options = {
+                    f"{item['name']} ({item['ticker']})": item
+                    for item in public_companies
+                }
+                with directory_col:
+                    selected_company = st.selectbox(
+                        "Browse all listed companies",
+                        options=list(company_options.keys()),
+                        index=None,
+                        placeholder="Or browse the public-company directory…",
+                        label_visibility="collapsed",
+                        key="public_company_directory",
+                    )
+                with directory_button_col:
+                    st.markdown('<div style="height:1px"></div>', unsafe_allow_html=True)
+                    analyze_selected = st.button(
+                        "Open selected", key="analyze_public_company",
+                        use_container_width=True, disabled=not selected_company,
+                    )
+                if selected_company and analyze_selected:
+                    selected = company_options[selected_company]
+                    st.session_state.ticker = selected["ticker"]
+                    st.session_state.company_name = selected["name"]
+                    st.session_state.chat_history = []
+                    st.session_state.cfo_brief = None
+                    st.session_state.upload_statements = None
+                    st.session_state.upload_company_name = None
+                    st.session_state.upload_peer = ""
+
+            if st.session_state.recent_companies:
+                with st.expander("Recently analyzed", expanded=False):
+                    recent_cols = st.columns(min(5, len(st.session_state.recent_companies)), gap="small")
+                    for i, (recent_ticker, recent_name) in enumerate(st.session_state.recent_companies[:5]):
+                        with recent_cols[i]:
+                            if st.button(recent_name, key=f"recent_{recent_ticker}", use_container_width=True):
+                                st.session_state.ticker = recent_ticker
+                                st.session_state.company_name = recent_name
+                                st.session_state.chat_history = []
+                                st.session_state.cfo_brief = None
+                                st.rerun()
+
+    else:
+        search_input = ""
+        search_btn = False
 else:
     search_input = ""
     search_btn = False
@@ -1154,6 +1159,20 @@ if not st.session_state.ticker:
         )
     with landing_search_btn_col:
         landing_search_btn = st.button("Analyze company", type="primary", use_container_width=True, key="landing_analyze_company")
+    st.markdown('<div style="font-size:11px;color:#8E9AAF;font-weight:650;margin:16px 0 8px">QUICK LOOKUP · A MIX OF INDUSTRIES & COMPANY SIZES</div>', unsafe_allow_html=True)
+    quick_cols = st.columns(8, gap="small")
+    for i, (quick_ticker, quick_name, quick_category) in enumerate(quick_companies):
+        with quick_cols[i]:
+            if st.button(quick_name, key=f"landing_quick_{quick_ticker}", use_container_width=True, help=quick_category):
+                st.session_state.ticker = quick_ticker
+                st.session_state.company_name = quick_name
+                st.session_state.chat_history = []
+                st.session_state.cfo_brief = None
+                st.session_state.upload_statements = None
+                st.session_state.upload_company_name = None
+                st.session_state.upload_peer = ""
+                st.rerun()
+
     if landing_search_btn and landing_search_input.strip():
         with st.spinner(f"Identifying {landing_search_input.strip()}…"):
             landing_ticker, landing_name = resolve_ticker(landing_search_input.strip())
