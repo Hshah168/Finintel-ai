@@ -314,7 +314,7 @@ with st.container(key="finintel-sticky-controls"):
         display:none !important; visibility:hidden !important;
     }
     .block-container { padding-top: 0.5rem !important; max-width: 1500px !important; }
-    /* Pin the complete intro/search area to the viewport, not just the logo row. */
+    /* Only the compact brand row and workspace toggle stay fixed. */
     .st-key-finintel-sticky-controls {
         position: fixed !important;
         top: 0 !important;
@@ -325,18 +325,24 @@ with st.container(key="finintel-sticky-controls"):
         box-sizing: border-box !important;
         z-index: 999999 !important;
         background: #05080E !important;
-        padding: 8px max(18px, calc((100vw - 1500px) / 2)) 12px !important;
+        padding: 8px max(18px, calc((100vw - 1500px) / 2)) 10px !important;
         border-bottom: 1px solid #263449;
-        box-shadow: 0 12px 24px rgba(0,0,0,.55);
+        box-shadow: 0 8px 20px rgba(0,0,0,.42);
         overflow: visible !important;
     }
     .st-key-finintel-sticky-controls .finintel-brand-row {
         position: relative !important;
         top: auto !important;
         box-shadow: none;
-        margin-top: 0;
+        margin: 0 0 8px;
     }
-    /* Keep the first scrollable content below the fixed controls. */
+    .st-key-finintel-sticky-controls [data-testid="stRadio"] {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    .st-key-finintel-sticky-controls [data-testid="stRadio"] > label {
+        display: none !important;
+    }
     @media (max-width: 700px) {
         .st-key-finintel-sticky-controls {
             padding-left: 10px !important;
@@ -344,7 +350,7 @@ with st.container(key="finintel-sticky-controls"):
         }
     }
     .finintel-brand-row {
-        position:sticky; top:0; z-index:999999;
+        position:relative;
         display:flex; align-items:center; gap:12px; padding:12px 18px;
         background:rgba(5,8,14,.97); backdrop-filter:blur(16px);
         border:1px solid #263449; border-radius:0 0 14px 14px;
@@ -406,195 +412,187 @@ with st.container(key="finintel-sticky-controls"):
     )
     st.markdown('<div style="height:5px"></div>', unsafe_allow_html=True)
 
-    if app_mode == "Company Research":
-        st.markdown('<div class="finintel-workspace-label">Research any public company</div>', unsafe_allow_html=True)
-        search_col, search_btn_col = st.columns([5, 1.1], gap="small")
-        with search_col:
-            search_input = st.text_input(
-                "Company name or ticker",
-                placeholder="Search a company or enter a ticker — e.g. Microsoft, AAPL, TCS…",
-                label_visibility="collapsed",
-                key="main_company_search",
-            )
-        with search_btn_col:
-            search_btn = st.button("Analyze company", type="primary", use_container_width=True, key="main_analyze_company")
+    st.markdown('<div style="height:8px"></div>', unsafe_allow_html=True)
 
-        # A deliberate cross-section of smaller companies, industries, crypto, FX, and commodities.
-        # Yahoo Finance symbols are used so these buttons feed into the existing lookup flow.
-        quick_companies = [
-            ("CROX", "Crocs"),
-            ("SOFI", "SoFi"),
-            ("COIN", "Coinbase"),
-            ("RKLB", "Rocket Lab"),
-            ("BTC-USD", "Bitcoin"),
-            ("ETH-USD", "Ethereum"),
-            ("EURUSD=X", "EUR / USD"),
-            ("GC=F", "Gold"),
-        ]
-        st.markdown('<div style="font-size:11px;color:#8E9AAF;font-weight:650;margin:5px 0 7px">QUICK LOOKUP · COMPANIES & MARKETS</div>', unsafe_allow_html=True)
-        quick_cols = st.columns(8, gap="small")
-        for i, (ticker, company_label) in enumerate(quick_companies):
-            with quick_cols[i]:
-                if st.button(company_label, key=f"quick_{ticker}", use_container_width=True):
-                    st.session_state.ticker = ticker
-                    st.session_state.company_name = company_label
-                    st.session_state.chat_history = []
-                    st.session_state.cfo_brief = None
-                    st.session_state.upload_statements = None
-                    st.session_state.upload_company_name = None
-                    st.session_state.upload_peer = ""
+# The compact brand/navigation bar is fixed; all research and upload controls
+# remain in normal document flow and scroll with the page.
+st.markdown(
+    '<div aria-hidden="true" style="height:132px;min-height:132px;width:100%"></div>',
+    unsafe_allow_html=True,
+)
 
-        public_companies = fetch_public_company_directory()
-        if public_companies:
-            directory_col, directory_button_col = st.columns([5, 1.1], gap="small")
-            company_options = {
-                f"{item['name']} ({item['ticker']})": item
-                for item in public_companies
-            }
-            with directory_col:
-                selected_company = st.selectbox(
-                    "Browse all listed companies",
-                    options=list(company_options.keys()),
-                    index=None,
-                    placeholder="Or browse the public-company directory…",
-                    label_visibility="collapsed",
-                    key="public_company_directory",
-                )
-            with directory_button_col:
-                st.markdown('<div style="height:1px"></div>', unsafe_allow_html=True)
-                analyze_selected = st.button(
-                    "Open selected", key="analyze_public_company",
-                    use_container_width=True, disabled=not selected_company,
-                )
-            if selected_company and analyze_selected:
-                selected = company_options[selected_company]
-                st.session_state.ticker = selected["ticker"]
-                st.session_state.company_name = selected["name"]
+if app_mode == "Company Research":
+    st.markdown('<div class="finintel-workspace-label">Research any public company</div>', unsafe_allow_html=True)
+    search_col, search_btn_col = st.columns([5, 1.1], gap="small")
+    with search_col:
+        search_input = st.text_input(
+            "Company name or ticker",
+            placeholder="Search a company or enter a ticker — e.g. Microsoft, AAPL, TCS…",
+            label_visibility="collapsed",
+            key="main_company_search",
+        )
+    with search_btn_col:
+        search_btn = st.button("Analyze company", type="primary", use_container_width=True, key="main_analyze_company")
+
+    # A deliberate cross-section of smaller companies, industries, crypto, FX, and commodities.
+    # Yahoo Finance symbols are used so these buttons feed into the existing lookup flow.
+    quick_companies = [
+        ("CROX", "Crocs"),
+        ("SOFI", "SoFi"),
+        ("COIN", "Coinbase"),
+        ("RKLB", "Rocket Lab"),
+        ("BTC-USD", "Bitcoin"),
+        ("ETH-USD", "Ethereum"),
+        ("EURUSD=X", "EUR / USD"),
+        ("GC=F", "Gold"),
+    ]
+    st.markdown('<div style="font-size:11px;color:#8E9AAF;font-weight:650;margin:5px 0 7px">QUICK LOOKUP · COMPANIES & MARKETS</div>', unsafe_allow_html=True)
+    quick_cols = st.columns(8, gap="small")
+    for i, (ticker, company_label) in enumerate(quick_companies):
+        with quick_cols[i]:
+            if st.button(company_label, key=f"quick_{ticker}", use_container_width=True):
+                st.session_state.ticker = ticker
+                st.session_state.company_name = company_label
                 st.session_state.chat_history = []
                 st.session_state.cfo_brief = None
                 st.session_state.upload_statements = None
                 st.session_state.upload_company_name = None
                 st.session_state.upload_peer = ""
 
-        if st.session_state.recent_companies:
-            with st.expander("Recently analyzed", expanded=False):
-                recent_cols = st.columns(min(5, len(st.session_state.recent_companies)), gap="small")
-                for i, (recent_ticker, recent_name) in enumerate(st.session_state.recent_companies[:5]):
-                    with recent_cols[i]:
-                        if st.button(recent_name, key=f"recent_{recent_ticker}", use_container_width=True):
-                            st.session_state.ticker = recent_ticker
-                            st.session_state.company_name = recent_name
-                            st.session_state.chat_history = []
-                            st.session_state.cfo_brief = None
-                            st.rerun()
-    else:
-        search_input = ""
-        search_btn = False
-        st.markdown('<div class="finintel-workspace-label">Analyze your own financial data</div>', unsafe_allow_html=True)
-        upload_name_col, upload_peer_col = st.columns([1, 1], gap="medium")
-        with upload_name_col:
-            upload_name_input = st.text_input(
-                "Company or business unit name",
-                placeholder="Company, division, or cost center",
-                key="upload_name",
+    public_companies = fetch_public_company_directory()
+    if public_companies:
+        directory_col, directory_button_col = st.columns([5, 1.1], gap="small")
+        company_options = {
+            f"{item['name']} ({item['ticker']})": item
+            for item in public_companies
+        }
+        with directory_col:
+            selected_company = st.selectbox(
+                "Browse all listed companies",
+                options=list(company_options.keys()),
+                index=None,
+                placeholder="Or browse the public-company directory…",
+                label_visibility="collapsed",
+                key="public_company_directory",
             )
-        with upload_peer_col:
-            upload_peer_input = st.text_input(
-                "Optional public peer ticker or name",
-                placeholder="Optional benchmark peer, e.g. Microsoft",
-                key="upload_peer",
+        with directory_button_col:
+            st.markdown('<div style="height:1px"></div>', unsafe_allow_html=True)
+            analyze_selected = st.button(
+                "Open selected", key="analyze_public_company",
+                use_container_width=True, disabled=not selected_company,
             )
-        upload_file_col, upload_instructions_col = st.columns([1.2, 1], gap="large")
-        with upload_file_col:
-            uploaded_file = st.file_uploader(
-                "Upload financial statements (Excel, CSV, or PDF)",
-                type=["xlsx", "xls", "csv", "pdf"],
-                key="upload_file",
-                help="Upload an Excel workbook, CSV, or PDF containing financial statements.",
-            )
-        with upload_instructions_col:
-            st.markdown(
-                '<div style="border:1px solid #64748B44;border-radius:12px;padding:14px 16px;'
-                'font-size:12px;line-height:1.7;color:#8E9AAF">'
-                '<strong style="color:#60A5FA">For best results</strong><br>'
-                'Use clear row labels such as Revenue, Net Income, Total Assets, and Total Debt. '
-                'Excel sheets can be named Income Statement, Balance Sheet, and Cash Flow.'
-                '</div>',
-                unsafe_allow_html=True,
-            )
-        upload_btn_col, template_col = st.columns([1.15, 5], gap="small")
-        with upload_btn_col:
-            upload_btn = st.button("Analyze financials", type="primary", use_container_width=True)
-        with template_col:
-            sample = {
-                "Income Statement": pd.DataFrame({
-                    "Line Item": ["Total Revenue","Gross Profit","Operating Income","Net Income","EBITDA"],
-                    "2022": [50e6,20e6,8e6,5e6,10e6],
-                    "2023": [60e6,25e6,10e6,7e6,13e6],
-                    "2024": [72e6,31e6,13e6,9e6,16e6],
-                }),
-                "Balance Sheet": pd.DataFrame({
-                    "Line Item": ["Total Current Assets","Total Assets","Total Current Liabilities","Total Debt","Total Stockholder Equity"],
-                    "2022": [15e6,45e6,8e6,12e6,25e6],
-                    "2023": [18e6,52e6,9e6,10e6,30e6],
-                    "2024": [22e6,61e6,10e6,8e6,37e6],
-                }),
-                "Cash Flow": pd.DataFrame({
-                    "Line Item": ["Operating Cash Flow","Capital Expenditure","Free Cash Flow"],
-                    "2022": [8e6,-2e6,6e6],
-                    "2023": [11e6,-3e6,8e6],
-                    "2024": [14e6,-3.5e6,10.5e6],
-                }),
-            }
-            template_buf = io.BytesIO()
-            with pd.ExcelWriter(template_buf, engine="openpyxl") as writer:
-                for sheet_name, df in sample.items():
-                    df.to_excel(writer, sheet_name=sheet_name, index=False)
-            template_buf.seek(0)
-            st.download_button(
-                "Download Excel template",
-                data=template_buf.getvalue(),
-                file_name="FinIntel_Template.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            )
-        if upload_btn:
-            if uploaded_file:
-                with st.spinner("Parsing your financials…"):
-                    stmts, detected = parse_uploaded_file(uploaded_file)
-                    upload_company = upload_name_input.strip() or detected or "My Company"
-                    available_statements = get_available_statements(stmts)
-                if available_statements:
-                    st.session_state.upload_statements = stmts
-                    st.session_state.upload_company_name = upload_company
-                    st.session_state.upload_peer = upload_peer_input.strip()
-                    st.session_state.ticker = None
-                    st.success(f"Parsed: {', '.join(available_statements)}")
-                    st.rerun()
-                else:
-                    st.error("Could not extract financial statements. Check row labels and year columns.")
-            else:
-                st.warning("Please upload a financial file first.")
+        if selected_company and analyze_selected:
+            selected = company_options[selected_company]
+            st.session_state.ticker = selected["ticker"]
+            st.session_state.company_name = selected["name"]
+            st.session_state.chat_history = []
+            st.session_state.cfo_brief = None
+            st.session_state.upload_statements = None
+            st.session_state.upload_company_name = None
+            st.session_state.upload_peer = ""
 
-
-
-
-
-# The fixed header is removed from normal document flow, so reserve room for it.
-# The fixed top section is taller in Private Financials because it contains
-# two input rows, the uploader, helper panel, and action buttons. Reserve extra
-# document space there so the analysis cards cannot slide underneath the fixed controls.
-if app_mode == "Private Financials":
-    # Restore the original Private Financials spacing.
-    _header_spacer_height = 540
+    if st.session_state.recent_companies:
+        with st.expander("Recently analyzed", expanded=False):
+            recent_cols = st.columns(min(5, len(st.session_state.recent_companies)), gap="small")
+            for i, (recent_ticker, recent_name) in enumerate(st.session_state.recent_companies[:5]):
+                with recent_cols[i]:
+                    if st.button(recent_name, key=f"recent_{recent_ticker}", use_container_width=True):
+                        st.session_state.ticker = recent_ticker
+                        st.session_state.company_name = recent_name
+                        st.session_state.chat_history = []
+                        st.session_state.cfo_brief = None
+                        st.rerun()
 else:
-    # Leave a comfortable visual gap (about 1 inch) between the fixed lookup
-    # controls and the Company Research landing hero.
-    _header_spacer_height = 340
+    search_input = ""
+    search_btn = False
+    st.markdown('<div class="finintel-workspace-label">Analyze your own financial data</div>', unsafe_allow_html=True)
+    upload_name_col, upload_peer_col = st.columns([1, 1], gap="medium")
+    with upload_name_col:
+        upload_name_input = st.text_input(
+            "Company or business unit name",
+            placeholder="Company, division, or cost center",
+            key="upload_name",
+        )
+    with upload_peer_col:
+        upload_peer_input = st.text_input(
+            "Optional public peer ticker or name",
+            placeholder="Optional benchmark peer, e.g. Microsoft",
+            key="upload_peer",
+        )
+    upload_file_col, upload_instructions_col = st.columns([1.2, 1], gap="large")
+    with upload_file_col:
+        uploaded_file = st.file_uploader(
+            "Upload financial statements (Excel, CSV, or PDF)",
+            type=["xlsx", "xls", "csv", "pdf"],
+            key="upload_file",
+            help="Upload an Excel workbook, CSV, or PDF containing financial statements.",
+        )
+    with upload_instructions_col:
+        st.markdown(
+            '<div style="border:1px solid #64748B44;border-radius:12px;padding:14px 16px;'
+            'font-size:12px;line-height:1.7;color:#8E9AAF">'
+            '<strong style="color:#60A5FA">For best results</strong><br>'
+            'Use clear row labels such as Revenue, Net Income, Total Assets, and Total Debt. '
+            'Excel sheets can be named Income Statement, Balance Sheet, and Cash Flow.'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+    upload_btn_col, template_col = st.columns([1.15, 5], gap="small")
+    with upload_btn_col:
+        upload_btn = st.button("Analyze financials", type="primary", use_container_width=True)
+    with template_col:
+        sample = {
+            "Income Statement": pd.DataFrame({
+                "Line Item": ["Total Revenue","Gross Profit","Operating Income","Net Income","EBITDA"],
+                "2022": [50e6,20e6,8e6,5e6,10e6],
+                "2023": [60e6,25e6,10e6,7e6,13e6],
+                "2024": [72e6,31e6,13e6,9e6,16e6],
+            }),
+            "Balance Sheet": pd.DataFrame({
+                "Line Item": ["Total Current Assets","Total Assets","Total Current Liabilities","Total Debt","Total Stockholder Equity"],
+                "2022": [15e6,45e6,8e6,12e6,25e6],
+                "2023": [18e6,52e6,9e6,10e6,30e6],
+                "2024": [22e6,61e6,10e6,8e6,37e6],
+            }),
+            "Cash Flow": pd.DataFrame({
+                "Line Item": ["Operating Cash Flow","Capital Expenditure","Free Cash Flow"],
+                "2022": [8e6,-2e6,6e6],
+                "2023": [11e6,-3e6,8e6],
+                "2024": [14e6,-3.5e6,10.5e6],
+            }),
+        }
+        template_buf = io.BytesIO()
+        with pd.ExcelWriter(template_buf, engine="openpyxl") as writer:
+            for sheet_name, df in sample.items():
+                df.to_excel(writer, sheet_name=sheet_name, index=False)
+        template_buf.seek(0)
+        st.download_button(
+            "Download Excel template",
+            data=template_buf.getvalue(),
+            file_name="FinIntel_Template.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+    if upload_btn:
+        if uploaded_file:
+            with st.spinner("Parsing your financials…"):
+                stmts, detected = parse_uploaded_file(uploaded_file)
+                upload_company = upload_name_input.strip() or detected or "My Company"
+                available_statements = get_available_statements(stmts)
+            if available_statements:
+                st.session_state.upload_statements = stmts
+                st.session_state.upload_company_name = upload_company
+                st.session_state.upload_peer = upload_peer_input.strip()
+                st.session_state.ticker = None
+                st.success(f"Parsed: {', '.join(available_statements)}")
+                st.rerun()
+            else:
+                st.error("Could not extract financial statements. Check row labels and year columns.")
+        else:
+            st.warning("Please upload a financial file first.")
 
-st.markdown(
-    f'<div aria-hidden="true" style="height:{_header_spacer_height}px;min-height:{_header_spacer_height}px;width:100%"></div>',
-    unsafe_allow_html=True,
-)
+
+
+
 
 groq_key = _load_groq_key()
 
