@@ -419,12 +419,19 @@ with st.container(key="finintel-sticky-controls"):
         with search_btn_col:
             search_btn = st.button("Analyze company", type="primary", use_container_width=True, key="main_analyze_company")
 
+        # A deliberate cross-section of smaller companies, industries, crypto, FX, and commodities.
+        # Yahoo Finance symbols are used so these buttons feed into the existing lookup flow.
         quick_companies = [
-            ("MSFT", "Microsoft"), ("AAPL", "Apple"), ("NVDA", "NVIDIA"),
-            ("GOOGL", "Alphabet"), ("AMZN", "Amazon"), ("TSLA", "Tesla"),
-            ("SAP", "SAP SE"), ("TCS.NS", "TCS"),
+            ("CROX", "Crocs"),
+            ("SOFI", "SoFi"),
+            ("COIN", "Coinbase"),
+            ("RKLB", "Rocket Lab"),
+            ("BTC-USD", "Bitcoin"),
+            ("ETH-USD", "Ethereum"),
+            ("EURUSD=X", "EUR / USD"),
+            ("GC=F", "Gold"),
         ]
-        st.markdown('<div style="font-size:11px;color:#8E9AAF;font-weight:650;margin:5px 0 7px">QUICK LOOKUP</div>', unsafe_allow_html=True)
+        st.markdown('<div style="font-size:11px;color:#8E9AAF;font-weight:650;margin:5px 0 7px">QUICK LOOKUP · COMPANIES & MARKETS</div>', unsafe_allow_html=True)
         quick_cols = st.columns(8, gap="small")
         for i, (ticker, company_label) in enumerate(quick_companies):
             with quick_cols[i]:
