@@ -977,7 +977,7 @@ if not st.session_state.ticker:
             'FINANCIAL INTELLIGENCE, IN ACTION</div>'
             '<h1 style="font-size:48px;line-height:1.04;letter-spacing:-2px;'
             'font-weight:800;color:var(--landing-heading,#FFFFFF);margin:0 0 26px">'
-            'Know the numbers.<br>Understand the business.</h1>'
+            'Understand the business behind the numbers.</h1>'
             '<p style="font-size:17px;line-height:1.6;color:var(--landing-copy,#B8C1CF);'
             'margin:0 0 16px">Financial intelligence that turns company statements into '
             'clear performance signals, peer context, and executive-ready insights.</p>'
