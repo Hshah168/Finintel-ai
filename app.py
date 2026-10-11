@@ -103,10 +103,6 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# Persist each visitor's theme choice across Streamlit reruns.
-if "theme_mode" not in st.session_state:
-    st.session_state.theme_mode = "Dark"
-
 # ─── Global CSS ───────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
@@ -287,94 +283,6 @@ button[kind="header"] {
 </style>
 """, unsafe_allow_html=True)
 
-# ─── Light theme overrides ────────────────────────────────────────────────────
-if st.session_state.get("theme_mode", "Dark") == "Light":
-    st.markdown("""
-    <style>
-    .stApp, [data-testid="stAppViewContainer"] {
-        background:#F5F7FB !important; color:#111827 !important;
-    }
-    [data-testid="stHeader"] { background:rgba(245,247,251,.92) !important; }
-    [data-testid="stSidebar"] {
-        background:#FFFFFF !important; border-right:1px solid #E5E7EB !important;
-    }
-    [data-testid="stSidebar"] .stMarkdown p,
-    [data-testid="stSidebar"] label { color:#4B5563 !important; }
-    [data-testid="stMetric"] {
-        background:#FFFFFF !important; border:1px solid #E5E7EB !important;
-        border-radius:12px !important; padding:14px !important;
-    }
-    [data-testid="stMetricLabel"], [data-testid="stMetricValue"],
-    .stMarkdown, .stMarkdown p { color:#111827; }
-    .stTextInput input, .stTextArea textarea, [data-testid="stChatInput"] textarea {
-        background:#FFFFFF !important; color:#111827 !important;
-        border-color:#D1D5DB !important;
-    }
-    [data-testid="stSelectbox"] > div > div,
-    [data-testid="stRadio"] { color:#111827 !important; }
-    .stApp [data-testid="stMarkdownContainer"] h1 { color:#111827 !important; }
-    .stApp [data-testid="stMarkdownContainer"] p { color:#374151; }
-    .stApp a { color:#1D4ED8 !important; }
-
-    /* Force readable dark text across Streamlit widgets and custom components. */
-    .stApp, .stApp p:not(.finintel-demo-panel *), .stApp span:not(.finintel-demo-panel *),
-    .stApp label:not(.finintel-demo-panel *), .stApp li:not(.finintel-demo-panel *),
-    .stApp div[data-testid="stMarkdownContainer"]:not(.finintel-demo-panel),
-    .stApp div[data-testid="stMarkdownContainer"] *:not(.finintel-demo-panel *),
-    .stApp [data-testid="stCaptionContainer"]:not(.finintel-demo-panel),
-    .stApp [data-testid="stCaptionContainer"] *:not(.finintel-demo-panel *),
-    .stApp [data-testid="stWidgetLabel"]:not(.finintel-demo-panel),
-    .stApp [data-testid="stWidgetLabel"] *:not(.finintel-demo-panel *),
-    .stApp [data-testid="stMetricLabel"]:not(.finintel-demo-panel *),
-    .stApp [data-testid="stMetricValue"]:not(.finintel-demo-panel *),
-    .stApp [data-testid="stMetricDelta"]:not(.finintel-demo-panel *),
-    .stApp [data-testid="stExpander"] summary:not(.finintel-demo-panel *),
-    .stApp [data-testid="stExpander"] summary *:not(.finintel-demo-panel *),
-    .stApp [data-testid="stDataFrame"]:not(.finintel-demo-panel *),
-    .stApp [data-testid="stTable"]:not(.finintel-demo-panel *),
-    .stApp [data-testid="stAlert"] *:not(.finintel-demo-panel *),
-    .stApp [data-testid="stRadio"] *:not(.finintel-demo-panel *),
-    .stApp [data-testid="stCheckbox"] *:not(.finintel-demo-panel *),
-    .stApp [data-testid="stSelectbox"] *:not(.finintel-demo-panel *),
-    .stApp [data-testid="stMultiSelect"] *:not(.finintel-demo-panel *),
-    .stApp [data-testid="stNumberInput"] *:not(.finintel-demo-panel *),
-    .stApp [data-testid="stDateInput"] *:not(.finintel-demo-panel *),
-    .stApp [data-testid="stFileUploader"] *:not(.finintel-demo-panel *),
-    .stApp [data-testid="stTabs"] button:not(.finintel-demo-panel *),
-    .stApp [data-testid="stTabs"] button *:not(.finintel-demo-panel *),
-    .stApp [data-testid="stSidebar"] *:not(.finintel-demo-panel *),
-    .stApp [data-testid="stHeader"] *:not(.finintel-demo-panel *),
-    .stApp [data-testid="stToolbar"] *:not(.finintel-demo-panel *) {
-        color:#111827 !important;
-    }
-    .stApp [data-testid="stMetric"] {
-        background:#FFFFFF !important; border-color:#E5E7EB !important;
-    }
-    .stApp button[kind="primary"] *,
-    .stApp button[kind="secondary"] * {
-        color:#111827 !important;
-    }
-    .stApp input, .stApp textarea, .stApp [contenteditable="true"] {
-        color:#111827 !important;
-        -webkit-text-fill-color:#111827 !important;
-    }
-    .stApp input::placeholder, .stApp textarea::placeholder {
-        color:#6B7280 !important;
-        -webkit-text-fill-color:#6B7280 !important;
-    }
-    .stApp [data-testid="stChatInput"] textarea {
-        color:#111827 !important;
-        -webkit-text-fill-color:#111827 !important;
-    }
-    .stTabs [data-baseweb="tab-list"] {
-        background:#E9EDF4 !important; border-color:#D9E0EA !important;
-    }
-    .stTabs [aria-selected="true"] {
-        background:#FFFFFF !important; color:#111827 !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
 # ─── Session state init ────────────────────────────────────────────────────────
 if "ticker" not in st.session_state:
     st.session_state.ticker = None
@@ -400,29 +308,60 @@ if "recent_companies" not in st.session_state:
 # FinIntel AI uses one full-width workspace; no separate sidebar navigation.
 st.markdown("""
 <style>
-section[data-testid="stSidebar"],
-[data-testid="stSidebar"],
-[data-testid="collapsedControl"],
-[data-testid="stSidebarCollapsedControl"],
-button[kind="header"] { display:none !important; visibility:hidden !important; }
-.block-container { padding-top: 1.25rem !important; max-width: 1500px !important; }
+section[data-testid="stSidebar"], [data-testid="stSidebar"],
+[data-testid="collapsedControl"], [data-testid="stSidebarCollapsedControl"] {
+    display:none !important; visibility:hidden !important;
+}
+.block-container { padding-top: 0.5rem !important; max-width: 1500px !important; }
 .finintel-brand-row {
-    display:flex; align-items:center; gap:12px; padding:5px 0 16px;
-    border-bottom:1px solid #64748B33; margin-bottom:16px;
+    position:sticky; top:0; z-index:999999;
+    display:flex; align-items:center; gap:12px; padding:12px 18px;
+    background:rgba(5,8,14,.97); backdrop-filter:blur(16px);
+    border:1px solid #263449; border-radius:0 0 14px 14px;
+    box-shadow:0 8px 24px rgba(0,0,0,.25); margin:0 0 18px;
 }
 .finintel-brand-mark {
-    width:42px;height:42px;display:flex;align-items:center;justify-content:center;
+    flex:0 0 auto;width:42px;height:42px;display:flex;align-items:center;justify-content:center;
     border-radius:12px;background:linear-gradient(135deg,#2563EB,#0F766E);
     box-shadow:0 5px 14px #2563EB33;color:#FFFFFF;font-size:21px;font-weight:850;
 }
-.finintel-brand-name {font-size:27px;line-height:1.05;font-weight:850;color:var(--text-color,#FFFFFF);letter-spacing:-.9px;}
+.finintel-brand-copy {flex:1;min-width:150px;}
+.finintel-brand-name {font-size:25px;line-height:1.05;font-weight:850;color:#FFFFFF;letter-spacing:-.9px;}
 .finintel-brand-tag {font-size:10px;color:#8E9AAF;font-weight:700;letter-spacing:1.25px;text-transform:uppercase;margin-top:5px;}
+.finintel-socials {display:flex;align-items:center;gap:10px;margin-left:auto;flex-wrap:wrap;}
+.finintel-social-link {
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    min-height:38px;padding:0 12px;border:1px solid #334155;border-radius:10px;
+    color:#E2E8F0 !important;text-decoration:none !important;font-size:13px;font-weight:650;
+    background:#111827;white-space:nowrap;transition:all .15s ease;
+}
+.finintel-social-link:hover {border-color:#60A5FA;background:#17243A;transform:translateY(-1px);}
+.finintel-social-link.linkedin {color:#7DB8FF !important;}
 .finintel-workspace-label {font-size:11px;font-weight:750;letter-spacing:1.3px;text-transform:uppercase;color:#60A5FA;margin:5px 0 8px;}
+@media (max-width:700px) {
+ .finintel-brand-row {padding:10px;gap:8px;}
+ .finintel-brand-name {font-size:20px;}
+ .finintel-brand-tag {font-size:8px;letter-spacing:.7px;}
+ .finintel-social-link {font-size:0;padding:0;width:38px;min-width:38px;}
+ .finintel-social-link svg {width:19px;height:19px;}
+}
 </style>
 <div class="finintel-brand-row">
   <div class="finintel-brand-mark">F</div>
-  <div><div class="finintel-brand-name">FinIntel AI</div>
-  <div class="finintel-brand-tag">Financial intelligence workspace</div></div>
+  <div class="finintel-brand-copy">
+    <div class="finintel-brand-name">FinIntel AI</div>
+    <div class="finintel-brand-tag">Financial intelligence workspace</div>
+  </div>
+  <div class="finintel-socials">
+    <a class="finintel-social-link linkedin" aria-label="LinkedIn" title="LinkedIn" href="https://www.linkedin.com/in/shah-hetal/" target="_blank" rel="noopener noreferrer">
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19 3A2 2 0 0 1 21 5V19A2 2 0 0 1 19 21H5A2 2 0 0 1 3 19V5A2 2 0 0 1 5 3H19ZM8.34 17.34V10H5.67V17.34H8.34ZM7 8.99A1.55 1.55 0 1 0 7 5.89A1.55 1.55 0 0 0 7 8.99ZM18.34 17.34V13.32C18.34 11.17 17.19 10.17 15.66 10.17C14.42 10.17 13.86 10.85 13.55 11.33V10H10.88V17.34H13.55V13.75C13.55 12.8 13.73 11.88 14.91 11.88C16.08 11.88 16.1 12.97 16.1 13.81V17.34H18.34Z"/></svg>
+      LinkedIn
+    </a>
+    <a class="finintel-social-link" aria-label="GitHub" title="GitHub" href="https://github.com/Hshah168" target="_blank" rel="noopener noreferrer">
+      <svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .9A11.1 11.1 0 0 0 8.49 22.53c.55.1.76-.24.76-.53v-2.08c-3.1.68-3.76-1.32-3.76-1.32-.5-1.29-1.24-1.63-1.24-1.63-1.02-.7.08-.69.08-.69 1.13.08 1.73 1.16 1.73 1.16 1 1.72 2.63 1.22 3.27.93.1-.72.39-1.22.71-1.5-2.48-.28-5.09-1.24-5.09-5.53 0-1.22.44-2.22 1.16-3-.12-.28-.5-1.42.11-2.96 0 0 .95-.3 3.05 1.15a10.6 10.6 0 0 1 5.55 0c2.1-1.45 2.68.23 2.96.11 0 0 .95-.3 3.05 1.15a10.6 10.6 0 0 1 5.55 0c2.1-1.45 3.05-1.15 3.05-1.15.61 1.54.23 2.68.11 2.96.72.78 1.16 1.78 1.16 3 0 4.3-2.61 5.25-5.1 5.52.4.35.75 1.03.75 2.08V22c0 .29.2.63.76.52A11.1 11.1 0 0 0 12 .9Z"/></svg>
+      GitHub
+    </a>
+  </div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -601,39 +540,7 @@ else:
 
 groq_key = _load_groq_key()
 
-# ─── Top-right links and theme control ────────────────────────────────────────
-top_spacer, linkedin_col, github_col, theme_col = st.columns([6.2, 1.15, 1.05, 1.45])
-with linkedin_col:
-    st.markdown(
-        '<div style="display:flex;justify-content:flex-end;padding-top:5px">'
-        '<a aria-label="LinkedIn profile" title="LinkedIn profile" '
-        'href="https://www.linkedin.com/in/shah-hetal/" target="_blank" rel="noopener noreferrer" '
-        'style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;'
-        'border:1px solid #64748B55;border-radius:10px;color:#0A66C2;text-decoration:none">'
-        '<svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" '
-        'fill="currentColor" aria-hidden="true"><path d="M19 3A2 2 0 0 1 21 5V19A2 2 0 0 1 19 21H5A2 2 0 0 1 3 19V5A2 2 0 0 1 5 3H19ZM8.34 17.34V10H5.67V17.34H8.34ZM7 8.99A1.55 1.55 0 1 0 7 5.89A1.55 1.55 0 0 0 7 8.99ZM18.34 17.34V13.32C18.34 11.17 17.19 10.17 15.66 10.17C14.42 10.17 13.86 10.85 13.55 11.33V10H10.88V17.34H13.55V13.75C13.55 12.8 13.73 11.88 14.91 11.88C16.08 11.88 16.1 12.97 16.1 13.81V17.34H18.34Z"/></svg>'
-        '</a></div>',
-        unsafe_allow_html=True,
-    )
-with github_col:
-    st.markdown(
-        '<div style="display:flex;justify-content:flex-end;padding-top:5px">'
-        '<a aria-label="GitHub profile" title="GitHub profile" '
-        'href="https://github.com/Hshah168" target="_blank" rel="noopener noreferrer" '
-        'style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;'
-        'border:1px solid #64748B55;border-radius:10px;color:#111827;text-decoration:none">'
-        '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" '
-        'fill="currentColor" aria-hidden="true"><path d="M12 .9A11.1 11.1 0 0 0 8.49 22.53c.55.1.76-.24.76-.53v-2.08c-3.1.68-3.76-1.32-3.76-1.32-.5-1.29-1.24-1.63-1.24-1.63-1.02-.7.08-.69.08-.69 1.13.08 1.73 1.16 1.73 1.16 1 1.72 2.63 1.22 3.27.93.1-.72.39-1.22.71-1.5-2.48-.28-5.09-1.24-5.09-5.53 0-1.22.44-2.22 1.16-3-.12-.28-.5-1.42.11-2.96 0 0 .95-.3 3.05 1.15a10.6 10.6 0 0 1 5.55 0c2.1-1.45 3.05-1.15 3.05-1.15.61 1.54.23 2.68.11 2.96.72.78 1.16 1.78 1.16 3 0 4.3-2.61 5.25-5.1 5.52.4.35.75 1.03.75 2.08V22c0 .29.2.63.76.52A11.1 11.1 0 0 0 12 .9Z"/></svg>'
-        '</a></div>',
-        unsafe_allow_html=True,
-    )
-with theme_col:
-    st.selectbox(
-        "Theme",
-        options=["Dark", "Light"],
-        key="theme_mode",
-        label_visibility="collapsed",
-    )
+# Social links are part of the sticky website header above.
 
 # ─── Load FMP key for IPO tracker ─────────────────────────────────────────────
 def _load_fmp_key() -> str:
@@ -1196,10 +1103,9 @@ if not st.session_state.ticker:
             trend_layout["margin"] = dict(l=18, r=18, t=20, b=28)
             trend_layout["yaxis"]["tickprefix"] = "$"
             trend_layout["yaxis"]["ticksuffix"] = "B"
-            chart_is_light = st.session_state.get("theme_mode", "Dark") == "Light"
-            chart_text = "#334155" if chart_is_light else "#FFFFFF"
-            chart_muted = "#64748B" if chart_is_light else "#8E8E93"
-            chart_grid = "#E2E8F0" if chart_is_light else "#2C2C2E"
+            chart_text = "#FFFFFF"
+            chart_muted = "#8E8E93"
+            chart_grid = "#2C2C2E"
             trend_layout["font"] = dict(color=chart_text, family="Inter, system-ui, sans-serif")
             trend_layout["xaxis"].update(gridcolor=chart_grid, linecolor=chart_grid, tickfont=dict(color=chart_muted))
             trend_layout["yaxis"].update(gridcolor=chart_grid, linecolor=chart_grid, tickfont=dict(color=chart_muted))
