@@ -586,9 +586,9 @@ with st.container(key="finintel-sticky-controls"):
 if app_mode == "Private Financials":
     _header_spacer_height = 660
 else:
-    # Company Research has a shorter fixed header; keep the landing hero close
-    # to the lookup controls instead of leaving a large blank band.
-    _header_spacer_height = 270
+    # Leave a comfortable visual gap (about 1 inch) between the fixed lookup
+    # controls and the Company Research landing hero.
+    _header_spacer_height = 340
 
 st.markdown(
     f'<div aria-hidden="true" style="height:{_header_spacer_height}px;min-height:{_header_spacer_height}px;width:100%"></div>',
