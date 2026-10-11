@@ -314,22 +314,34 @@ with st.container(key="finintel-sticky-controls"):
         display:none !important; visibility:hidden !important;
     }
     .block-container { padding-top: 0.5rem !important; max-width: 1500px !important; }
+    /* Pin the complete intro/search area to the viewport, not just the logo row. */
     .st-key-finintel-sticky-controls {
-        position: sticky !important;
+        position: fixed !important;
         top: 0 !important;
-        z-index: 99999 !important;
+        left: 0 !important;
+        right: 0 !important;
+        width: 100vw !important;
+        max-width: none !important;
+        box-sizing: border-box !important;
+        z-index: 999999 !important;
         background: #05080E !important;
-        padding: 0 0 12px !important;
+        padding: 8px max(18px, calc((100vw - 1500px) / 2)) 12px !important;
         border-bottom: 1px solid #263449;
-        box-shadow: 0 12px 24px rgba(0,0,0,.34);
+        box-shadow: 0 12px 24px rgba(0,0,0,.55);
+        overflow: visible !important;
     }
     .st-key-finintel-sticky-controls .finintel-brand-row {
-        position: relative;
-        top: auto;
+        position: relative !important;
+        top: auto !important;
         box-shadow: none;
+        margin-top: 0;
     }
+    /* Keep the first scrollable content below the fixed controls. */
     @media (max-width: 700px) {
-        .st-key-finintel-sticky-controls { position: relative !important; }
+        .st-key-finintel-sticky-controls {
+            padding-left: 10px !important;
+            padding-right: 10px !important;
+        }
     }
     .finintel-brand-row {
         position:sticky; top:0; z-index:999999;
@@ -557,6 +569,14 @@ with st.container(key="finintel-sticky-controls"):
                 st.warning("Please upload a financial file first.")
 
 
+
+
+
+# The fixed header is removed from normal document flow, so reserve room for it.
+st.markdown(
+    '<div aria-hidden="true" style="height:320px;min-height:320px;width:100%"></div>',
+    unsafe_allow_html=True,
+)
 
 groq_key = _load_groq_key()
 
