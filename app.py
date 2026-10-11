@@ -103,10 +103,6 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# Persist each visitor's theme choice across Streamlit reruns.
-if "theme_mode" not in st.session_state:
-    st.session_state.theme_mode = "Dark"
-
 # ─── Global CSS ───────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
@@ -451,15 +447,28 @@ if app_mode == "Company Research":
         search_btn = st.button("Analyze company", type="primary", use_container_width=True, key="main_analyze_company")
 
     quick_companies = [
-        ("MSFT", "Microsoft"), ("AAPL", "Apple"), ("NVDA", "NVIDIA"),
-        ("GOOGL", "Alphabet"), ("AMZN", "Amazon"), ("TSLA", "Tesla"),
-        ("SAP", "SAP SE"), ("TCS.NS", "TCS"),
+        ("MSFT", "Microsoft", "Mega-cap · Technology"),
+        ("WMT", "Walmart", "Mega-cap · Retail"),
+        ("JPM", "JPMorgan", "Large-cap · Banking"),
+        ("XOM", "ExxonMobil", "Large-cap · Energy"),
+        ("LLY", "Eli Lilly", "Large-cap · Healthcare"),
+        ("TM", "Toyota", "Large-cap · Automotive"),
+        ("DE", "Deere", "Large-cap · Industrials"),
+        ("SONY", "Sony", "Large-cap · Entertainment"),
+        ("SHOP", "Shopify", "Mid-cap · Commerce"),
+        ("CROX", "Crocs", "Mid-cap · Consumer"),
+        ("DUOL", "Duolingo", "Mid-cap · Education tech"),
+        ("SOFI", "SoFi", "Mid-cap · Fintech"),
+        ("ELF", "e.l.f. Beauty", "Mid-cap · Beauty"),
+        ("RKLB", "Rocket Lab", "Smaller-cap · Aerospace"),
+        ("HIMS", "Hims & Hers", "Smaller-cap · Digital health"),
+        ("CAVA", "CAVA", "Smaller-cap · Restaurants"),
     ]
-    st.markdown('<div style="font-size:11px;color:#8E9AAF;font-weight:650;margin:5px 0 7px">QUICK LOOKUP</div>', unsafe_allow_html=True)
+    st.markdown('<div style="font-size:11px;color:#8E9AAF;font-weight:650;margin:5px 0 7px">QUICK LOOKUP · A MIX OF INDUSTRIES & COMPANY SIZES</div>', unsafe_allow_html=True)
     quick_cols = st.columns(8, gap="small")
-    for i, (ticker, company_label) in enumerate(quick_companies):
+    for i, (ticker, company_label, company_category) in enumerate(quick_companies):
         with quick_cols[i]:
-            if st.button(company_label, key=f"quick_{ticker}", use_container_width=True):
+            if st.button(company_label, key=f"quick_{ticker}", use_container_width=True, help=company_category):
                 st.session_state.ticker = ticker
                 st.session_state.company_name = company_label
                 st.session_state.chat_history = []
@@ -601,14 +610,14 @@ else:
 
 groq_key = _load_groq_key()
 
-# ─── Top-right links and theme control ────────────────────────────────────────
-top_spacer, linkedin_col, github_col, theme_col = st.columns([6.2, 1.15, 1.05, 1.45])
+# ─── Social links in the website header ───────────────────────────────────────
+header_spacer, linkedin_col, github_col = st.columns([10, 0.65, 0.65], gap="small")
 with linkedin_col:
     st.markdown(
         '<div style="display:flex;justify-content:flex-end;padding-top:5px">'
         '<a aria-label="LinkedIn profile" title="LinkedIn profile" '
         'href="https://www.linkedin.com/in/shah-hetal/" target="_blank" rel="noopener noreferrer" '
-        'style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;'
+        'style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;'
         'border:1px solid #64748B55;border-radius:10px;color:#0A66C2;text-decoration:none">'
         '<svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" '
         'fill="currentColor" aria-hidden="true"><path d="M19 3A2 2 0 0 1 21 5V19A2 2 0 0 1 19 21H5A2 2 0 0 1 3 19V5A2 2 0 0 1 5 3H19ZM8.34 17.34V10H5.67V17.34H8.34ZM7 8.99A1.55 1.55 0 1 0 7 5.89A1.55 1.55 0 0 0 7 8.99ZM18.34 17.34V13.32C18.34 11.17 17.19 10.17 15.66 10.17C14.42 10.17 13.86 10.85 13.55 11.33V10H10.88V17.34H13.55V13.75C13.55 12.8 13.73 11.88 14.91 11.88C16.08 11.88 16.1 12.97 16.1 13.81V17.34H18.34Z"/></svg>'
@@ -620,19 +629,12 @@ with github_col:
         '<div style="display:flex;justify-content:flex-end;padding-top:5px">'
         '<a aria-label="GitHub profile" title="GitHub profile" '
         'href="https://github.com/Hshah168" target="_blank" rel="noopener noreferrer" '
-        'style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;'
-        'border:1px solid #64748B55;border-radius:10px;color:#111827;text-decoration:none">'
+        'style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;'
+        'border:1px solid #64748B55;border-radius:10px;color:var(--text-color,#FFFFFF);text-decoration:none">'
         '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" '
         'fill="currentColor" aria-hidden="true"><path d="M12 .9A11.1 11.1 0 0 0 8.49 22.53c.55.1.76-.24.76-.53v-2.08c-3.1.68-3.76-1.32-3.76-1.32-.5-1.29-1.24-1.63-1.24-1.63-1.02-.7.08-.69.08-.69 1.13.08 1.73 1.16 1.73 1.16 1 1.72 2.63 1.22 3.27.93.1-.72.39-1.22.71-1.5-2.48-.28-5.09-1.24-5.09-5.53 0-1.22.44-2.22 1.16-3-.12-.28-.5-1.42.11-2.96 0 0 .95-.3 3.05 1.15a10.6 10.6 0 0 1 5.55 0c2.1-1.45 3.05-1.15 3.05-1.15.61 1.54.23 2.68.11 2.96.72.78 1.16 1.78 1.16 3 0 4.3-2.61 5.25-5.1 5.52.4.35.75 1.03.75 2.08V22c0 .29.2.63.76.52A11.1 11.1 0 0 0 12 .9Z"/></svg>'
         '</a></div>',
         unsafe_allow_html=True,
-    )
-with theme_col:
-    st.selectbox(
-        "Theme",
-        options=["Dark", "Light"],
-        key="theme_mode",
-        label_visibility="collapsed",
     )
 
 # ─── Load FMP key for IPO tracker ─────────────────────────────────────────────
@@ -1130,6 +1132,45 @@ if not st.session_state.ticker:
             unsafe_allow_html=True,
         )
 
+    # Company search follows the intro snapshot so visitors first understand the product.
+    st.markdown('<div style="height:22px"></div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div style="border-top:1px solid #263449;padding-top:22px">'
+        '<p style="font-size:11px;font-weight:700;letter-spacing:1.4px;color:#60A5FA;'
+        'text-transform:uppercase;margin:0 0 7px">Start your research</p>'
+        '<h2 style="font-size:24px;font-weight:750;letter-spacing:-.5px;'
+        'color:#FFFFFF;margin:0 0 5px">Which company do you want to understand?</h2>'
+        '<p style="font-size:13px;color:#9CAEC4;margin:0 0 14px">Search a ticker or choose from companies across industries and sizes.</p>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+    landing_search_col, landing_search_btn_col = st.columns([5, 1.15], gap="small")
+    with landing_search_col:
+        landing_search_input = st.text_input(
+            "Company name or ticker",
+            placeholder="Search any company — e.g. Microsoft, SOFI, Toyota, CAVA…",
+            label_visibility="collapsed",
+            key="landing_company_search",
+        )
+    with landing_search_btn_col:
+        landing_search_btn = st.button("Analyze company", type="primary", use_container_width=True, key="landing_analyze_company")
+    if landing_search_btn and landing_search_input.strip():
+        with st.spinner(f"Identifying {landing_search_input.strip()}…"):
+            landing_ticker, landing_name = resolve_ticker(landing_search_input.strip())
+        if landing_ticker == "PRIVATE":
+            st.warning("This appears to be a private company. Switch to Private Financials to upload its statements.")
+        elif landing_ticker:
+            st.session_state.ticker = landing_ticker
+            st.session_state.company_name = landing_name
+            st.session_state.chat_history = []
+            st.session_state.cfo_brief = None
+            st.session_state.upload_statements = None
+            st.session_state.upload_company_name = None
+            st.session_state.upload_peer = ""
+            st.rerun()
+        else:
+            st.error("Could not identify that company. Try its stock ticker.")
+
     # ── Homepage financial charts ─────────────────────────────────────────────
     st.markdown('<div style="height:34px"></div>', unsafe_allow_html=True)
     st.markdown(
@@ -1196,10 +1237,9 @@ if not st.session_state.ticker:
             trend_layout["margin"] = dict(l=18, r=18, t=20, b=28)
             trend_layout["yaxis"]["tickprefix"] = "$"
             trend_layout["yaxis"]["ticksuffix"] = "B"
-            chart_is_light = st.session_state.get("theme_mode", "Dark") == "Light"
-            chart_text = "#334155" if chart_is_light else "#FFFFFF"
-            chart_muted = "#64748B" if chart_is_light else "#8E8E93"
-            chart_grid = "#E2E8F0" if chart_is_light else "#2C2C2E"
+            chart_text = "#FFFFFF"
+            chart_muted = "#8E8E93"
+            chart_grid = "#2C2C2E"
             trend_layout["font"] = dict(color=chart_text, family="Inter, system-ui, sans-serif")
             trend_layout["xaxis"].update(gridcolor=chart_grid, linecolor=chart_grid, tickfont=dict(color=chart_muted))
             trend_layout["yaxis"].update(gridcolor=chart_grid, linecolor=chart_grid, tickfont=dict(color=chart_muted))
