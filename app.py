@@ -581,7 +581,9 @@ with st.container(key="finintel-sticky-controls"):
 
 # The fixed header is removed from normal document flow, so reserve room for it.
 st.markdown(
-    '<div aria-hidden="true" style="height:320px;min-height:320px;width:100%"></div>',
+    # Reserve the full height of the fixed header + mode-specific controls.
+    # The private-financials upload form is taller than the company lookup row.
+    '<div aria-hidden="true" style="height:540px;min-height:540px;width:100%"></div>',
     unsafe_allow_html=True,
 )
 
