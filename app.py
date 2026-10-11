@@ -580,10 +580,17 @@ with st.container(key="finintel-sticky-controls"):
 
 
 # The fixed header is removed from normal document flow, so reserve room for it.
+# The fixed top section is taller in Private Financials because it contains
+# two input rows, the uploader, helper panel, and action buttons. Reserve extra
+# document space there so the analysis cards cannot slide underneath the fixed controls.
+if app_mode == "Private Financials":
+    _header_spacer_height = 660
+else:
+    # Preserve the existing Company Research spacing exactly.
+    _header_spacer_height = 540
+
 st.markdown(
-    # Reserve the full height of the fixed header + mode-specific controls.
-    # The private-financials upload form is taller than the company lookup row.
-    '<div aria-hidden="true" style="height:540px;min-height:540px;width:100%"></div>',
+    f'<div aria-hidden="true" style="height:{_header_spacer_height}px;min-height:{_header_spacer_height}px;width:100%"></div>',
     unsafe_allow_html=True,
 )
 
