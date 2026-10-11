@@ -584,8 +584,8 @@ with st.container(key="finintel-sticky-controls"):
 # two input rows, the uploader, helper panel, and action buttons. Reserve extra
 # document space there so the analysis cards cannot slide underneath the fixed controls.
 if app_mode == "Private Financials":
-    # Keep roughly one inch of breathing room below the fixed private-financials controls.
-    _header_spacer_height = 340
+    # Restore the original Private Financials spacing.
+    _header_spacer_height = 540
 else:
     # Leave a comfortable visual gap (about 1 inch) between the fixed lookup
     # controls and the Company Research landing hero.
